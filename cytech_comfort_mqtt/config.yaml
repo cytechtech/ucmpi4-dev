@@ -7,30 +7,30 @@ startup: application
 apparmor: true
 panel_icon: "mdi:alarm-panel-outline"
 codenotary: notary@home-assistant.io
-url: https://github.com/ghall-zebsys/cytech-home-assistant-addons
+url: "https://github.com/ghall-zebsys/cytech-home-assistant-addons"
 hassio_api: true
 uart: true
 devices:
   - /dev/ttyS0:/dev/ttyS0
 privileged:
   - SYS_RAWIO
-options:
-  device: "/dev/serial0"
-  baudrate: 115200
-schema:
-  device: str
-  baudrate: int
+
 arch:
   - aarch64
   - amd64
   - armhf
   - armv7
   - i386
+
 services:
   - mqtt:need
+
 map:
   - addon_config:ro
+
 options:
+  device: "/dev/serial0"
+  baudrate: 115200
   mqtt_broker_address: core-mosquitto
   mqtt_user: null
   mqtt_password: null
@@ -49,10 +49,13 @@ options:
   alarm_outputs: 0
   alarm_responses: 0
   comfort_time: false
+
 schema:
+  device: str
+  baudrate: int
   mqtt_broker_address: str
-  mqtt_user: str
-  mqtt_password: password
+  mqtt_user: str?
+  mqtt_password: password?
   mqtt_broker_port: int(1024,65535)?
   mqtt_protocol: list(TCP|WebSockets)?
   mqtt_encryption: bool?
@@ -60,7 +63,7 @@ schema:
   require_certificate: bool?
   broker_client_cert: str?
   broker_client_key: str?
-  comfort_login_id: password
+  comfort_login_id: password?
   comfort_cclx_file: str?
   comfort_battery_update: list(0|1|33|34|35|36|37|38|39)?
   log_verbosity: list(DEBUG|INFO|WARNING|ERROR|CRITICAL)?
@@ -68,4 +71,3 @@ schema:
   alarm_outputs: list(0|8|16|24|32|40|48|56|64|72|80|88|96)?
   alarm_responses: int(0,1024)?
   comfort_time: bool?
-
