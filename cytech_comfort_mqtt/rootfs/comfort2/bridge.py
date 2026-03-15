@@ -87,6 +87,19 @@ def is_ipv4_address(address):
     except ValueError:
         return False
 
+def resolve_to_ip(fqdn):
+    try:
+        return socket.gethostbyname(fqdn)
+    except socket.gaierror:
+        return None
+
+def is_ipv4_address(address):
+    try:
+        ipaddress.ip_address(address)
+        return True
+    except ValueError:
+        return False
+
 
 def get_ip_address(input_value):
     if is_ipv4_address(input_value):
@@ -250,18 +263,7 @@ else:
         logger.error("Failed to get Addon Info: Error Code %s, %s", response.status_code, response.reason)
 
 
-def is_ipv4_address(address):
-    try:
-        ipaddress.ip_address(address)
-        return True
-    except ValueError:
-        return False
 
-def resolve_to_ip(fqdn):
-    try:
-        return socket.gethostbyname(fqdn)
-    except socket.gaierror:
-        return None
 
 def validate_port(_port, min=1, max=65535):
     try:
