@@ -2518,7 +2518,7 @@ class Comfort2(mqtt.Client):
 
                             elif line[1:5] == "u?01":       # Determine CPU type if available.
                                 uMsg = Comfort_U_SystemCPUTypeReport(line[1:])
-                                                
+            
                                 settings.device_properties['CPUType'] = str(uMsg.cputype)
                                 if str(uMsg.cputype) != "N/A":
                                     logging.debug("%s Mainboard CPU detected. Battery Monitoring Enabled.", str(settings.device_properties['CPUType']))
