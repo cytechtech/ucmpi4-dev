@@ -45,23 +45,11 @@ configuration:
     description: >-
       A file containing the Client Private key. Place this file in the Home
       Assistant `addon_config/<comfort2mqtt slug>/certificates` folder.
-  comfort_port:
-    name: Comfort TCP Port
-    description: >-
-      Cytech Comfort UCM/Ethernet TCP Port. Range from 1 - 65535 (Default is 1002).
-  comfort_address:
-    name: Comfort IP address
-    description: >-
-      Cytech Comfort IP Address in IPV4 format or DNS resolvable host FQDN.
   comfort_login_id:
     name: Comfort User Login ID
     description: >-
       Cytech Comfort User Login ID with at least Read-Only access. Login ID has minimum 4 characters and 6 as maximum.
       For full functionality you need Read/Write access as well as Disarm capabilities.
-  comfort_cclx_file:
-    name: Comfort Configuration file
-    description: >-
-      Comfort Configuration file, also referred to as the 'CCLX' file to be used for object enrichment EG. Zone Names etc.
   comfort_battery_update:
     name: Comfort MQTT Bridge Battery Update target ID.
     description: >-
@@ -86,6 +74,14 @@ configuration:
     name: Comfort Counters
     description: >-
       The number of Cytech Comfort Counters that are shown in Home Assistant and can range from 0 - 255 (Default is 8).
+  timer_count:
+    name: Comfort Timers
+    description: >-
+      The number of Cytech Comfort Timers that are shown in Home Assistant and can range from 0 - 64 (Default is 8).
+  sensor_count:
+    name: Comfort Sensors
+    description: >-
+      The number of Cytech Comfort Sensors that are shown in Home Assistant and can range from 0 - 32 (Default is 8).
   alarm_responses:
     name: Comfort Responses
     description: >-
