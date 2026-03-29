@@ -2422,8 +2422,19 @@ class Comfort2(mqtt.Client):
         battery_topic = settings.DOMAIN + "/alarm/battery_main_voltage"
         dc_topic = settings.DOMAIN + "/alarm/dc_supply_main_voltage"
 
-        battery_main = str(settings.device_properties.get("BatteryVoltageMain", "-1"))
-        dc_supply_main = str(settings.device_properties.get("ChargeVoltageMain", "-1"))
+        raw_battery = settings.device_properties.get("BatteryVoltageMain", "-1")
+        raw_dc = settings.device_properties.get("ChargeVoltageMain", "-1")
+
+        try:
+            battery_main = f"{float(raw_battery):.2f}"
+        except:
+            battery_main = "-1"
+
+        try:
+            dc_supply_main = f"{float(raw_dc):.2f}"
+        except:
+            dc_supply_main = "-1"
+
 
         logging.info(
             "PublishBatteryVoltageStates: battery_topic=%s battery_main=%s dc_topic=%s dc_supply_main=%s",
