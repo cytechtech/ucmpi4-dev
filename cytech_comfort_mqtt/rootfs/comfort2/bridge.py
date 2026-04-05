@@ -2388,11 +2388,11 @@ class Comfort2(mqtt.Client):
             dc_discovery_topic = f"homeassistant/sensor/{settings.DOMAIN}/dc_supply_slave{sem}_voltage/config"
 
             self.publish(battery_discovery_topic, "", qos=2, retain=True)
-            logger.info("Cleared retained battery discovery topic: %s", battery_discovery_topic)
+            logger.debug("Cleared retained battery discovery topic: %s", battery_discovery_topic)
             time.sleep(0.02)
 
             self.publish(dc_discovery_topic, "", qos=2, retain=True)
-            logger.info("Cleared retained DC supply discovery topic: %s", dc_discovery_topic)
+            logger.debug("Cleared retained DC supply discovery topic: %s", dc_discovery_topic)
             time.sleep(0.02)
 
         sensors = [
@@ -2806,8 +2806,20 @@ class Comfort2(mqtt.Client):
                                     retain=True
                                 )
 
+
                             elif line[1:3] == "sr" and settings.CacheState:
+                                logger.info("SR raw line      = %r", line)
+                                logger.info("SR line[1:]      = %r", line[1:])
+                                logger.info("SR chars/ord     = %s", [f"{c}:{ord(c):02X}" for c in line[1:]])
+
                                 ipMsgSR = Comfort_RSensorActivationReport(line[1:])
+
+                                logger.info(
+                                    "SR parsed result  = sensor=%s value=%s",
+                                    getattr(ipMsgSR, "sensor", None),
+                                    getattr(ipMsgSR, "value", None)
+                                )
+
                                 sensor_id = ipMsgSR.sensor
                                 value = ipMsgSR.value
                                 topic = settings.ALARMSENSORTOPIC % sensor_id
@@ -2832,6 +2844,7 @@ class Comfort2(mqtt.Client):
                                     qos=2,
                                     retain=True
                                 )
+
 
                             elif line[1:3] == "TR":     # Timer Reports (Comfort stops reporting after a while)
 
