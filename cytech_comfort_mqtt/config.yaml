@@ -1,6 +1,6 @@
 name: "Cytech Comfort"
 description: "Cytech Comfort MQTT Bridge"
-version: "1.0.0-dev22"
+version: "1.0.0-dev23"
 slug: "cytech_comfort_mqtt"
 init: false
 startup: application
@@ -41,11 +41,6 @@ options:
   mqtt_password: null
   mqtt_broker_port: 1883
   mqtt_protocol: TCP
-  mqtt_encryption: false
-  broker_ca: "ca.crt"
-  require_certificate: false
-  broker_client_cert: "client.crt"
-  broker_client_key: "client.key"
   comfort_login_id: null
   comfort_battery_update: 1
   log_verbosity: INFO
@@ -64,11 +59,6 @@ schema:
   mqtt_password: password?
   mqtt_broker_port: int(1024,65535)?
   mqtt_protocol: list(TCP|WebSockets)?
-  mqtt_encryption: bool?
-  broker_ca: str?
-  require_certificate: bool?
-  broker_client_cert: str?
-  broker_client_key: str?
   comfort_login_id: password?
   comfort_battery_update: list(0|1|33|34|35|36|37|38|39)?
   log_verbosity: list(DEBUG|INFO|WARNING|ERROR|CRITICAL)?

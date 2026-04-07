@@ -21,30 +21,6 @@ configuration:
     name: MQTT Transport Protocol
     description: >-
       Use TCP or WebSockets as transport (Default TCP).
-  mqtt_encryption:
-    name: MQTT Transport Encryption
-    description: >-
-      Use TLS Encryption for MQTT Transport (Default False).
-  broker_ca:
-    name: CA Certificate File
-    description: >-
-      A file containing a CA certificate. Place this file in the Home
-      Assistant `addon_config/<comfort2mqtt slug>/certificates` folder.
-  require_certificate:
-    name: Require Certificate Authentication
-    description: >-
-      If enabled, authentication will be enabled using the mandatory Client
-      Certificate and Client Key file options.
-  broker_client_cert:
-    name: Client Certificate File
-    description: >-
-      A file containing a Client Certificate, including its chain. Place this file in the Home
-      Assistant `addon_config/<comfort2mqtt slug>/certificates` folder.
-  broker_client_key:
-    name: Client Private Key File
-    description: >-
-      A file containing the Client Private key. Place this file in the Home
-      Assistant `addon_config/<comfort2mqtt slug>/certificates` folder.
   comfort_login_id:
     name: Comfort User Login ID
     description: >-

@@ -7,7 +7,6 @@ logger = logging.getLogger(__name__)
 DOMAIN = "cytech_comfort_mqtt"
 ADDON_SLUG = ''
 ADDON_VERSION = "N/A"
-ALPINE_VERSION = "N/A"
 COMFORT_SERIAL = "00000000"       # Default Serial Number.
 COMFORT_KEY = "00000000"          # Default Refresh Key.
 
@@ -49,11 +48,7 @@ MQTTUSERNAME = None
 MQTTPASSWORD = None
 
 MQTTPROTOCOL = "TCP"
-MQTTENCRYPTION = False
 
-MQTT_CA_CERT = None
-MQTT_CLIENT_CERT = None
-MQTT_CLIENT_KEY = None
 
 LOG_VERBOSITY = "INFO"
 
