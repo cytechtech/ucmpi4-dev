@@ -1,8 +1,10 @@
-# Copyright(c) 2018 Khor Chin Heong (koochyrat@gmail.com) for original project code and additional 
-# copyright(c) 2025 Ingo de Jager (ingodejager@gmail.com) for modifications done 
-# to the original project sources contained in this project.
+# Copyright (c) 2018 Khor Chin Heong (koochyrat@gmail.com)
+# Copyright (c) 2025 Ingo de Jager (ingodejager@gmail.com)
+# Copyright (c) 2026 Cytech Technology Pte Ltd
 #
-# Modified by Ingo de Jager 2025 (ingodejager@gmail.com)
+# Original project code by Khor Chin Heong.
+# Modifications in 2025 by Ingo de Jager.
+# Further modifications and enhancements in 2026 by Cytech Technology Pte Ltd.
 #
 # Licensed under the Apache License, Version 2.0 (the "License");
 # you may not use this file except in compliance with the License.
@@ -16,9 +18,7 @@
 # See the License for the specific language governing permissions and
 # limitations under the License.
 #
-# Notes:
-#
-#
+
 import defusedxml.ElementTree as ET
 import os
 import requests
@@ -2811,7 +2811,7 @@ class Comfort2(mqtt.Client):
 
             self.publish(
                 settings.ALARMCOUNTERTOPIC % ipMsgCT.counter,
-                str(ipMsgCT.value),
+                str(int(ipMsgCT.value)),
                 qos=2,
                 retain=True
             )
@@ -2821,7 +2821,7 @@ class Comfort2(mqtt.Client):
         elif line[1:3] == "s?":
             ipMsgSQ = Comfort_RSensorActivationReport(line[1:])
             sensor_id = ipMsgSQ.sensor
-            value = ipMsgSQ.value
+            value = int(ipMsgSQ.value)
             topic = settings.ALARMSENSORTOPIC % sensor_id
 
             self.publish(topic, str(value), qos=2, retain=True)
@@ -2830,7 +2830,7 @@ class Comfort2(mqtt.Client):
         elif line[1:3] == "sr" and settings.CacheState:
             ipMsgSR = Comfort_RSensorActivationReport(line[1:])
             sensor_id = ipMsgSR.sensor
-            value = ipMsgSR.value
+            value = int(ipMsgSR.value)
             topic = settings.ALARMSENSORTOPIC % sensor_id
 
             self.publish(topic, str(value), qos=2, retain=True)
@@ -3074,7 +3074,7 @@ class Comfort2(mqtt.Client):
             for cMsgr in cMsg.counters:
                 self.publish(
                     settings.ALARMCOUNTERTOPIC % cMsgr.counter,
-                    str(cMsgr.value),
+                    str(int(cMsgr.value)),
                     qos=2,
                     retain=True
                 )
@@ -3086,7 +3086,7 @@ class Comfort2(mqtt.Client):
             for sMsgr in sMsg.sensors:
                 self.publish(
                     settings.ALARMSENSORTOPIC % sMsgr.sensor,
-                    str(sMsgr.value),
+                    str(int(sMsgr.value)),
                     qos=2,
                     retain=True
                 )
