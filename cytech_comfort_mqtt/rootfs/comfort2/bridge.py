@@ -1891,10 +1891,6 @@ class Comfort2(mqtt.Client):
             topic_number = f"homeassistant/number/{settings.DOMAIN}/counter{i:03d}/config"
             self.publish(topic_number, "", qos=2, retain=True)
 
-            # Clear display sensor entity
-            topic_sensor = f"homeassistant/sensor/{settings.DOMAIN}/counter{i:03d}_value/config"
-            self.publish(topic_sensor, "", qos=2, retain=True)
-
             time.sleep(0.005)
 
     def clear_sensor_discovery(self):
@@ -1903,10 +1899,6 @@ class Comfort2(mqtt.Client):
             # Clear number entity
             topic_number = f"homeassistant/number/{settings.DOMAIN}/sensor{i:03d}/config"
             self.publish(topic_number, "", qos=2, retain=True)
-
-            # Clear display sensor entity
-            topic_sensor = f"homeassistant/sensor/{settings.DOMAIN}/sensor{i:03d}_value/config"
-            self.publish(topic_sensor, "", qos=2, retain=True)
 
             time.sleep(0.005)
 
@@ -2214,22 +2206,6 @@ class Comfort2(mqtt.Client):
             self.publish(number_discovery_topic, number_msg, qos=2, retain=True)
             time.sleep(0.01)
 
-            # Display-only sensor entity
-            sensor_discovery_topic = f"homeassistant/sensor/{settings.DOMAIN}/counter{i:03d}_value/config"
-            sensor_msg = json.dumps({
-                "name": f"{counter_name} Value",
-                "unique_id": f"{settings.DOMAIN}_counter{i:03d}_value",
-                "object_id": f"{settings.DOMAIN}_counter{i:03d}_value",
-                "state_topic": state_topic,
-                "value_template": "{{ value | int }}",
-                "suggested_display_precision": 0,
-                "availability": availability,
-                "availability_mode": "all",
-                "icon": "mdi:counter",
-                "device": mqtt_device,
-            })
-            self.publish(sensor_discovery_topic, sensor_msg, qos=2, retain=True)
-            time.sleep(0.01)
 
 
     def publish_sensor_discovery(self, mqtt_device):
@@ -2287,22 +2263,6 @@ class Comfort2(mqtt.Client):
             self.publish(number_discovery_topic, number_msg, qos=2, retain=True)
             time.sleep(0.01)
 
-            # Display-only sensor entity
-            sensor_discovery_topic = f"homeassistant/sensor/{settings.DOMAIN}/sensor{i:03d}_value/config"
-            sensor_msg = json.dumps({
-                "name": f"{sensor_name} Value",
-                "unique_id": f"{settings.DOMAIN}_sensor{i:03d}_value",
-                "object_id": f"{settings.DOMAIN}_sensor{i:03d}_value",
-                "state_topic": state_topic,
-                "value_template": "{{ value | int }}",
-                "suggested_display_precision": 0,
-                "availability": availability,
-                "availability_mode": "all",
-                "icon": "mdi:gauge",
-                "device": mqtt_device,
-            })
-            self.publish(sensor_discovery_topic, sensor_msg, qos=2, retain=True)
-            time.sleep(0.01)
 
 
     def publish_timer_discovery(self, mqtt_device):
