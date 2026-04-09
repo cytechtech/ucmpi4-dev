@@ -2054,17 +2054,6 @@ class Comfort2(mqtt.Client):
                 "device": mqtt_device,
             }
 
-            logger.warning(
-                "OUTPUT DISCOVERY: i=%03d topic=%s unique_id=%s object_id=%s state_topic=%s command_topic=%s",
-                i,
-                discovery_topic,
-                payload["unique_id"],
-                payload["object_id"],
-                payload["state_topic"],
-                payload["command_topic"],
-            )
-
-            logger.debug("OUTPUT PAYLOAD %03d: %s", i, json.dumps(payload, sort_keys=True))
 
             self.publish(discovery_topic, json.dumps(payload), qos=1, retain=True)
             time.sleep(0.05)
@@ -2073,30 +2062,21 @@ class Comfort2(mqtt.Client):
     def publish_input_discovery(self, mqtt_device):
         try:
             max_inputs = int(settings.COMFORT_INPUTS)
-            logger.info("publish_input_discovery: COMFORT_INPUTS=%r", settings.COMFORT_INPUTS)
-        except Exception as e:
-            logger.exception("Error reading COMFORT_INPUTS: %s", e)
+        except Exception:
             max_inputs = 0
 
         if max_inputs <= 0:
-            logger.warning("publish_input_discovery: COMFORT_INPUTS invalid (%r)", settings.COMFORT_INPUTS)
+            logger.warning(
+                "publish_input_discovery: COMFORT_INPUTS invalid (%r)",
+                getattr(settings, "COMFORT_INPUTS", None),
+            )
             return
 
         for i in range(1, max_inputs + 1):
-            logger.warning("INPUT DISCOVERY START %03d/%03d", i, max_inputs)
-
             name = f"Zone{i:03d}"
             device_class = None
 
             props = settings.input_properties.get(str(i)) if settings.ZONEMAPFILE else None
-
-            logger.debug(
-                "INPUT %03d props=%r (%s) ZONEMAPFILE=%s",
-                i,
-                props,
-                type(props),
-                settings.ZONEMAPFILE
-            )
 
             if props:
                 try:
@@ -2114,6 +2094,8 @@ class Comfort2(mqtt.Client):
                 "state_topic": state_topic,
                 "payload_on": "1",
                 "payload_off": "0",
+                "state_on": "1",
+                "state_off": "0",
                 "availability": [
                     {
                         "topic": settings.ALARMAVAILABLETOPIC,
@@ -2133,20 +2115,8 @@ class Comfort2(mqtt.Client):
             if device_class:
                 payload["device_class"] = device_class
 
-            logger.warning(
-                "INPUT DISCOVERY: i=%03d topic=%s unique_id=%s object_id=%s state_topic=%s",
-                i,
-                discovery_topic,
-                payload["unique_id"],
-                payload["object_id"],
-                payload["state_topic"],
-            )
-
-            logger.debug("INPUT PAYLOAD %03d: %s", i, json.dumps(payload, sort_keys=True))
-
             self.publish(discovery_topic, json.dumps(payload), qos=1, retain=True)
             time.sleep(0.05)
-
 
 
     def publish_flag_discovery(self, mqtt_device):
