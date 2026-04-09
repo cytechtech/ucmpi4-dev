@@ -144,6 +144,10 @@ settings.UI_COUNTER_COUNT = get_int(_opts, "counter_count", 8)
 settings.UI_TIMER_COUNT = get_int(_opts, "timer_count", 8)
 settings.UI_SENSOR_COUNT = get_int(_opts, "sensor_count", 8)
 
+logger.warning("OPTIONS RAW: %s", _opts)
+logger.warning("alarm_inputs option: %s", _opts.get("alarm_inputs"))
+logger.warning("alarm_outputs option: %s", _opts.get("alarm_outputs"))
+
 if settings.COMFORT_INPUTS < 8:
     settings.COMFORT_INPUTS = 8
 if settings.COMFORT_INPUTS > settings.MAX_ZONES:
