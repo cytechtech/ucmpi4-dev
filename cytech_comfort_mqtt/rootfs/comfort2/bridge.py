@@ -144,9 +144,6 @@ settings.UI_COUNTER_COUNT = get_int(_opts, "counter_count", 8)
 settings.UI_TIMER_COUNT = get_int(_opts, "timer_count", 8)
 settings.UI_SENSOR_COUNT = get_int(_opts, "sensor_count", 8)
 
-logger.warning("OPTIONS RAW: %s", _opts)
-logger.warning("alarm_inputs option: %s", _opts.get("alarm_inputs"))
-logger.warning("alarm_outputs option: %s", _opts.get("alarm_outputs"))
 
 if settings.COMFORT_INPUTS < 8:
     settings.COMFORT_INPUTS = 8
@@ -1940,9 +1937,8 @@ class Comfort2(mqtt.Client):
             topics.append(f"homeassistant/sensor/{settings.DOMAIN}/dc_supply_slave{sem}_voltage/config")
 
         for topic in topics:
-            logger.info("Clearing battery discovery topic: %s", topic)
-            self.publish(topic, "", qos=2, retain=True)
-            time.sleep(0.02)
+             self.publish(topic, "", qos=2, retain=True)
+             time.sleep(0.02)
 
 
 
@@ -1990,6 +1986,7 @@ class Comfort2(mqtt.Client):
 
 
         for i in range(1, max_outputs + 1):
+            logger.warning("Publishing output discovery entity %03d of %03d", i, max_outputs)
             props_str = settings.output_properties.get(str(i))
             props_int = settings.output_properties.get(i)
             props = settings.output_properties.get(str(i), settings.output_properties.get(i, {}))
@@ -2052,6 +2049,7 @@ class Comfort2(mqtt.Client):
         max_inputs = int(settings.COMFORT_INPUTS)
 
         for i in range(1, max_inputs + 1):
+            logger.warning("Publishing input discovery entity %03d of %03d", i, max_inputs)
             name = f"Zone{i}"
             device_class = None
 
@@ -2362,11 +2360,9 @@ class Comfort2(mqtt.Client):
             dc_discovery_topic = f"homeassistant/sensor/{settings.DOMAIN}/dc_supply_slave{sem}_voltage/config"
 
             self.publish(battery_discovery_topic, "", qos=2, retain=True)
-            logger.debug("Cleared retained battery discovery topic: %s", battery_discovery_topic)
             time.sleep(0.02)
 
             self.publish(dc_discovery_topic, "", qos=2, retain=True)
-            logger.debug("Cleared retained DC supply discovery topic: %s", dc_discovery_topic)
             time.sleep(0.02)
 
         sensors = [
@@ -2715,7 +2711,8 @@ class Comfort2(mqtt.Client):
 
             line = match.group(1)
 
-            logger.debug("RX: %s", line[1:])
+         #   logger.debug("RX: %s", line[1:])
+            logger.debug("RX FULL: %s", line[1:])
 
             self.handle_serial_line(line)
 
