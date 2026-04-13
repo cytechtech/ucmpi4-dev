@@ -737,7 +737,7 @@ class Comfort2(mqtt.Client):
         if value is None:
             return
 
-        logger.debug("Flushing counter %d update to %d", counter, value)
+       # logger.debug("Flushing counter %d update to %d", counter, value)
 
         try:
             self.set_counter(counter, value)
@@ -753,7 +753,7 @@ class Comfort2(mqtt.Client):
         if value is None:
             return
 
-        logger.debug("Flushing sensor %d update to %d", sensor, value)
+        #logger.debug("Flushing sensor %d update to %d", sensor, value)
 
         try:
             self.set_sensor(sensor, value)
