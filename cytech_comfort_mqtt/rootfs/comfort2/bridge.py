@@ -870,7 +870,7 @@ class Comfort2(mqtt.Client):
         if also_log and hasattr(self, "alarm_log"):
             self.alarm_log.add(text, level="MSG")
 
-   
+ 
     def readlines(self, delim=b'\r'):
         """
         Read CR-terminated lines from the Comfort serial port.
@@ -2787,8 +2787,47 @@ class Comfort2(mqtt.Client):
         elif line[1:5] == "PS00":
             self.setdatetime()
 
+        # --- TIME SYNC ---
+        elif line[1:5] == "PS00":
+            self.setdatetime()
+
+        # --- DATE/TIME REPORT ---
+        elif line[1:3] == "DT":
+            dt_raw = line[3:]
+
+            try:
+                year = int(dt_raw[0:4])
+                month = int(dt_raw[4:6])
+                day = int(dt_raw[6:8])
+                hour = int(dt_raw[8:10])
+                minute = int(dt_raw[10:12])
+                second = int(dt_raw[12:14])
+
+                comfort_dt = datetime(year, month, day, hour, minute, second)
+                logger.debug("Comfort date/time report: %s", comfort_dt.isoformat())
+
+                # Optional MQTT publish
+                # self.publish(
+                #     "cytech_comfort_mqtt/alarm/datetime",
+                #     comfort_dt.isoformat(),
+                #     qos=2,
+                #     retain=True
+                # )
+
+            except Exception as e:
+                logger.warning("Failed to parse DT line '%s': %s", line, e)
+
+
+        # --- ALARM EVENT / LOG ---
+        elif line[1:3] == "AL":
+            payload = line[3:]
+            logger.info("Comfort AL report: %s", payload)
+
         # --- INPUTS ---
-        elif line[1:3] == "IP" and settings.CacheState:
+        elif line[1:3] == "IP":
+            if not settings.CacheState:
+                logger.debug("Ignoring IP (CacheState=False): %s", line)
+                return
             ipMsg = ComfortIPInputActivationReport(line[1:])
 
             if ipMsg.state < 2:
@@ -2825,7 +2864,10 @@ class Comfort2(mqtt.Client):
                 self.publish(settings.ALARMLOGTOPIC, log_msg, qos=2, retain=False)
 
         # --- COUNTERS ---
-        elif line[1:3] == "CT" and settings.CacheState:
+        elif line[1:3] == "CT":
+            if not settings.CacheState:
+                logger.debug("Ignoring CT (CacheState=False): %s", line)
+                return
             ipMsgCT = ComfortCTCounterActivationReport(line[1:])
 
             self.publish(
@@ -2845,14 +2887,22 @@ class Comfort2(mqtt.Client):
 
             self.publish(topic, str(value), qos=2, retain=True)
 
+
         # --- SENSOR REPORT ---
-        elif line[1:3] == "sr" and settings.CacheState:
+        elif line[1:3] == "sr":
+            if not settings.CacheState:
+                logger.debug(
+                    "Ignoring sr (CacheState=False): %s",
+                    line
+                )
+                return
             ipMsgSR = Comfort_RSensorActivationReport(line[1:])
             sensor_id = ipMsgSR.sensor
             value = int(ipMsgSR.value)
             topic = settings.ALARMSENSORTOPIC % sensor_id
 
             self.publish(topic, str(value), qos=2, retain=True)
+
 
         # --- TIMER ---
         elif line[1:3] == "TR":
@@ -3004,7 +3054,11 @@ class Comfort2(mqtt.Client):
                 logging.info("System Disarmed")
 
         # --- ARM READY / NOT READY ---
-        elif line[1:3] == "ER" and settings.CacheState:
+
+        elif line[1:3] == "ER": 
+            if not settings.CacheState:
+                logger.debug("Ignoring ER (CacheState=False): %s", line)
+                return
             erMsg = ComfortERArmReadyNotReady(line[1:])
             if erMsg.zone != 0:
                 zone = str(erMsg.zone)
@@ -3062,7 +3116,12 @@ class Comfort2(mqtt.Client):
                 self.publish_alarm_message(message_topic, retain=True)
 
         # --- OUTPUT CHANGE ---
-        elif line[1:3] == "OP" and settings.CacheState:
+
+        elif line[1:3] == "OP":
+            if not settings.CacheState:
+                logger.debug("Ignoring OP (CacheState=False): %s", line)
+                return
+            
             opMsg = ComfortOPOutputActivationReport(line[1:])
             if opMsg.state < 2:
                 if 1 <= opMsg.output <= int(settings.COMFORT_OUTPUTS):
@@ -3147,14 +3206,20 @@ class Comfort2(mqtt.Client):
                 settings.device_properties['uid'] = "00000000"
 
         # --- FLAG CHANGE ---
-        elif line[1:3] == "FL" and settings.CacheState:
+        elif line[1:3] == "FL":
+            if not settings.CacheState:
+                logger.debug("Ignoring FL (CacheState=False): %s", line)
+                return
             flMsg = ComfortFLFlagActivationReport(line[1:])
             payload = "1" if int(flMsg.state) else "0"
             self.publish(settings.ALARMFLAGTOPIC % flMsg.flag, payload, qos=2, retain=True)
             time.sleep(0.01)
 
         # --- BYPASS CHANGE ---
-        elif line[1:3] == "BY" and settings.CacheState:
+        elif line[1:3] == "BY":
+            if not settings.CacheState:
+                logger.debug("Ignoring BY (CacheState=False): %s", line)
+                return
             byMsg = ComfortBYBypassActivationReport(line[1:])
             settings.BypassCache[byMsg.zone] = byMsg.state if byMsg.zone <= int(settings.COMFORT_INPUTS) else None
 

@@ -24,6 +24,15 @@ import logging
 logger = logging.getLogger(__name__)
 
 
+def set_cache_state(self, value, reason=""):
+    old_value = getattr(settings, "CacheState", None)
+    settings.CacheState = value
+    logger.info(
+        "CacheState change: %s -> %s%s",
+        old_value,
+        value,
+        f" | reason={reason}" if reason else ""
+    )
 class ComfortLUUserLoggedIn(object):
     def __init__(self, datastr="", user=1):             
         if datastr:
