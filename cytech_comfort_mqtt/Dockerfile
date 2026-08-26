@@ -4,14 +4,15 @@ FROM $BUILD_FROM
 RUN apk update --no-cache && apk upgrade --no-cache
 
 RUN pip install --no-cache-dir --upgrade pip \
- && pip install --no-cache-dir \
-      paho-mqtt \
-      pyopenssl \
-      requests \
-      defusedxml \
-      pyserial \
-      flask \
-      werkzeug
+    && pip install --no-cache-dir \
+        paho-mqtt \
+        pyopenssl \
+        cryptography \
+        requests \
+        defusedxml \
+        pyserial \
+        flask \
+        werkzeug
 
 # Copy root filesystem
 COPY rootfs /

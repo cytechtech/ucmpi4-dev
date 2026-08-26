@@ -52,6 +52,7 @@ from markupsafe import escape
 
 # Project imports
 from options import load_options, get_str, get_int, get_bool
+from mqtt_tls import configure_client_tls
 
 _opts = load_options()
 
@@ -131,6 +132,15 @@ def _set_passthrough_mode(active: bool) -> None:
     if MQTT_USER:
         c.username_pw_set(MQTT_USER, MQTT_PASS or "")
 
+    configure_client_tls(
+        c,
+        enabled=settings.MQTT_TLS_ENABLED,
+        mutual_tls=settings.MQTT_MUTUAL_TLS,
+        ca_filename=settings.MQTT_CA_CERT,
+        client_cert_filename=settings.MQTT_CLIENT_CERT,
+        client_key_filename=settings.MQTT_CLIENT_KEY,
+    )
+
     c.connect(MQTT_HOST, MQTT_PORT, 10)
 
     c.publish(
@@ -174,6 +184,16 @@ def mqtt_publish_reload(reason: str | None = None) -> None:
         logger.debug("MQTT auth configured (username provided)")
     else:
         logger.debug("MQTT auth not configured")
+
+
+    configure_client_tls(
+        c,
+        enabled=settings.MQTT_TLS_ENABLED,
+        mutual_tls=settings.MQTT_MUTUAL_TLS,
+        ca_filename=settings.MQTT_CA_CERT,
+        client_cert_filename=settings.MQTT_CLIENT_CERT,
+        client_key_filename=settings.MQTT_CLIENT_KEY,
+    )
 
     c.loop_start()
     try:

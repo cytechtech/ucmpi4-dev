@@ -52,6 +52,7 @@ import settings
 
 from cclx_parser import parse_cclx
 from options import load_options, get_str, get_int, get_bool
+from mqtt_tls import configure_client_tls
 import comfort_protocol
 from passthrough import ComfortPassthroughServer
 
@@ -1033,7 +1034,13 @@ class Comfort2(mqtt.Client):
 
 
     def readcurrentstate(self):
- 
+
+        if self.serial is None:
+            # Can be called from MQTT callbacks during the serial reconnect
+            # window, when self.serial has been reset to None.
+            logger.warning("readcurrentstate skipped: serial port not connected")
+            return
+
         if self.connected == True:
 
             settings.device_properties['BatteryVoltageMain'] = "-1"
@@ -2830,7 +2837,12 @@ class Comfort2(mqtt.Client):
          #   logger.debug("RX: %s", line[1:])
             logger.debug("RX FULL: %s", line[1:])
 
-            self.handle_serial_line(line)
+            try:
+                self.handle_serial_line(line)
+            except Exception:
+                # A malformed/truncated serial line must never take down the
+                # bridge. Log it, drop the line and carry on.
+                logger.exception("Error handling serial line %r, ignoring", line)
 
 
     def handle_serial_line(self, line):
@@ -3132,7 +3144,10 @@ class Comfort2(mqtt.Client):
 
         # --- ARM READY / NOT READY ---
 
-        elif line[1:3] == "ER": 
+        elif line[1:3] == "ER":
+            if len(line) < 5:
+                logger.warning("Ignoring truncated ER message: %r", line)
+                return
             if not settings.CacheState:
                 logger.debug("Ignoring ER (CacheState=False): %s", line)
                 return
@@ -3265,6 +3280,12 @@ class Comfort2(mqtt.Client):
 
         # --- BYPASS LIST ---
         elif line[1:3] == "b?":
+            # line[1:] is "b?00" + hex payload; the parser slices the payload
+            # into 8-bit segments, so it must be non-empty and an even number
+            # of hex digits or indexing runs past the final segment.
+            if len(line) <= 5 or (len(line) - 5) % 2 != 0:
+                logger.warning("Ignoring truncated b? message: %r", line)
+                return
             bMsg = comfort_protocol.ComfortB_ReportAllBypassZones(line[1:])
             if bMsg.value == 0:
                 self.publish(settings.ALARMBYPASSTOPIC, 0, qos=2, retain=True)
@@ -3423,6 +3444,16 @@ def main():
         transport=settings.MQTTPROTOCOL
     )
 
+
+    configure_client_tls(
+        mqttc,
+        enabled=settings.MQTT_TLS_ENABLED,
+        mutual_tls=settings.MQTT_MUTUAL_TLS,
+        ca_filename=settings.MQTT_CA_CERT,
+        client_cert_filename=settings.MQTT_CLIENT_CERT,
+        client_key_filename=settings.MQTT_CLIENT_KEY,
+    )
+        
     mqttc.init(
         settings.MQTTBROKER,
         settings.MQTTPORT,

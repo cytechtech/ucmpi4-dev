@@ -71,13 +71,15 @@ mqtt_client_id = DOMAIN+"-"+str(rand_hex_str[2:])       # Generate pseudo random
 
 MQTTBROKER = "core-mosquitto"
 MQTTBROKERIP = None
-MQTTPORT = 1883
 
-MQTTUSERNAME = "comfortHA"
-MQTTPASSWORD = "comfortHA"
+MQTT_TLS_ENABLED = False
+MQTT_MUTUAL_TLS = False
 
-MQTTPROTOCOL = "TCP"
+MQTT_CA_CERT = "cytech_comfort/ca.crt"
+MQTT_CLIENT_CERT = "cytech_comfort/comfort-client.crt"
+MQTT_CLIENT_KEY = "cytech_comfort/comfort-client.key"
 
+MQTTPORT = 8883 if MQTT_TLS_ENABLED else 1883
 
 LOG_VERBOSITY = "INFO"
 
