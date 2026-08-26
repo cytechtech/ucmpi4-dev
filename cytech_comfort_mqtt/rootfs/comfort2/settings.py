@@ -69,11 +69,17 @@ rand_int = lower + secrets.randbelow(upper - lower + 1)
 rand_hex_str = hex(rand_int)
 mqtt_client_id = DOMAIN+"-"+str(rand_hex_str[2:])       # Generate pseudo random client-id each time it starts.
 
-MQTTBROKER = "core-mosquitto"
-MQTTBROKERIP = None
+MQTTUSERNAME = "comfortHA"
+MQTTPASSWORD = "comfortHA"
 
+MQTTPROTOCOL = "TCP"
+
+# MQTT TLS settings
 MQTT_TLS_ENABLED = False
 MQTT_MUTUAL_TLS = False
+
+MQTTBROKER = "core-mosquitto"
+MQTTBROKERIP = None
 
 MQTT_CA_CERT = "cytech_comfort/ca.crt"
 MQTT_CLIENT_CERT = "cytech_comfort/comfort-client.crt"

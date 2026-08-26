@@ -6,7 +6,6 @@ RUN apk update --no-cache && apk upgrade --no-cache
 RUN pip install --no-cache-dir --upgrade pip \
     && pip install --no-cache-dir \
         paho-mqtt \
-        pyopenssl \
         cryptography \
         requests \
         defusedxml \
