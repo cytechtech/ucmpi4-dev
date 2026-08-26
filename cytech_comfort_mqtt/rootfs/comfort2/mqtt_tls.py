@@ -65,7 +65,9 @@ def validate_key_matches_cert(cert_path: Path, key_path: Path) -> None:
             cert_path.read_bytes(), default_backend()
         )
     except Exception as exc:
-        raise RuntimeError("Unable to read MQTT client certificate/private key") from exc
+        raise RuntimeError(
+            f"Unable to read certificate/private key: {cert_path}, {key_path}"
+    ) from exc
 
     cert_public_key = cert.public_key().public_bytes(
         encoding=serialization.Encoding.PEM,
@@ -77,8 +79,9 @@ def validate_key_matches_cert(cert_path: Path, key_path: Path) -> None:
     )
 
     if cert_public_key != key_public_key:
-        raise RuntimeError("MQTT client private key does not match its certificate")
-
+        raise RuntimeError(
+        f"Private key does not match certificate: {cert_path}"
+    )
 
 def configure_client_tls(
     client,

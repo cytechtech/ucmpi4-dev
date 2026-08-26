@@ -53,6 +53,7 @@ import settings
 from cclx_parser import parse_cclx
 from options import load_options, get_str, get_int, get_bool
 from mqtt_tls import configure_client_tls
+from certificate_manager import ensure_certificate_set
 import comfort_protocol
 from passthrough import ComfortPassthroughServer
 
@@ -3436,6 +3437,15 @@ def main():
     global ACTIVE_CLIENT
     global mqttc
     MQTT_VERSION = mqtt.MQTTv5
+
+    logger.info("Checking MQTT certificate installation")
+
+    try:
+        ensure_certificate_set()
+    except Exception:
+        logger.exception("MQTT certificate setup failed")
+        raise
+
 
     mqttc = Comfort2(
         callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
