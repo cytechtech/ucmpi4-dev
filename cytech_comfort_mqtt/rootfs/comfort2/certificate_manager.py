@@ -179,304 +179,304 @@ def generate_ca() -> None:
     logger.info("Local MQTT Certificate Authority generated successfully")
 
 
-    def generate_server_certificate() -> None:
-        """
-        Generate the Mosquitto MQTT server certificate and private key.
+def generate_server_certificate() -> None:
+    """
+    Generate the Mosquitto MQTT server certificate and private key.
 
-        The certificate is signed by the installation-specific local CA.
-        """
+    The certificate is signed by the installation-specific local CA.
+    """
 
-        ensure_certificate_directories()
+    ensure_certificate_directories()
 
-        if not CA_KEY.exists() or not CA_CERT.exists():
-            raise RuntimeError(
-                "Local CA does not exist; generate the CA before the server certificate"
-            )
-
-        if SERVER_KEY.exists() or SERVER_CERT.exists():
-            raise RuntimeError(
-                "Server key or certificate already exists; refusing to overwrite it"
-            )
-
-        logger.info("Generating Mosquitto MQTT server certificate")
-
-        ca_private_key = serialization.load_pem_private_key(
-            CA_KEY.read_bytes(),
-            password=None,
+    if not CA_KEY.exists() or not CA_CERT.exists():
+        raise RuntimeError(
+            "Local CA does not exist; generate the CA before the server certificate"
         )
 
-        ca_certificate = x509.load_pem_x509_certificate(
+    if SERVER_KEY.exists() or SERVER_CERT.exists():
+        raise RuntimeError(
+            "Server key or certificate already exists; refusing to overwrite it"
+        )
+
+    logger.info("Generating Mosquitto MQTT server certificate")
+
+    ca_private_key = serialization.load_pem_private_key(
+        CA_KEY.read_bytes(),
+        password=None,
+    )
+
+    ca_certificate = x509.load_pem_x509_certificate(
+        CA_CERT.read_bytes()
+    )
+
+    server_private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=3072,
+    )
+
+    subject = x509.Name([
+        x509.NameAttribute(
+            NameOID.COMMON_NAME,
+            "core-mosquitto",
+        ),
+    ])
+
+    now = datetime.now(timezone.utc)
+
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(ca_certificate.subject)
+        .public_key(server_private_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(minutes=5))
+        .not_valid_after(now + timedelta(days=365 * 10))
+        .add_extension(
+            x509.BasicConstraints(
+                ca=False,
+                path_length=None,
+            ),
+            critical=True,
+        )
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=True,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=False,
+                crl_sign=False,
+                encipher_only=None,
+                decipher_only=None,
+            ),
+            critical=True,
+        )
+        .add_extension(
+            x509.ExtendedKeyUsage([
+                x509.oid.ExtendedKeyUsageOID.SERVER_AUTH
+            ]),
+            critical=False,
+        )
+        .add_extension(
+            x509.SubjectAlternativeName([
+                x509.DNSName("core-mosquitto"),
+            ]),
+            critical=False,
+        )
+        .sign(
+            private_key=ca_private_key,
+            algorithm=hashes.SHA256(),
+        )
+    )
+
+    SERVER_KEY.write_bytes(
+        server_private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+    )
+
+    SERVER_KEY.chmod(0o600)
+
+    SERVER_CERT.write_bytes(
+        certificate.public_bytes(serialization.Encoding.PEM)
+    )
+
+    logger.info("Mosquitto MQTT server certificate generated successfully")
+
+
+def generate_client_certificate() -> None:
+    """
+    Generate the Cytech Comfort MQTT client certificate and private key.
+
+    The certificate is signed by the installation-specific local CA
+    and is intended for MQTT mutual TLS client authentication.
+    """
+
+    ensure_certificate_directories()
+
+    if not CA_KEY.exists() or not CA_CERT.exists():
+        raise RuntimeError(
+            "Local CA does not exist; generate the CA before the client certificate"
+        )
+
+    if CLIENT_KEY.exists() or CLIENT_CERT.exists():
+        raise RuntimeError(
+            "Client key or certificate already exists; refusing to overwrite it"
+        )
+
+    logger.info("Generating Cytech Comfort MQTT client certificate")
+
+    # Load the installation-specific CA.
+    ca_private_key = serialization.load_pem_private_key(
+        CA_KEY.read_bytes(),
+        password=None,
+    )
+
+    ca_certificate = x509.load_pem_x509_certificate(
+        CA_CERT.read_bytes()
+    )
+
+    # Generate a unique private key for this Comfort installation.
+    client_private_key = rsa.generate_private_key(
+        public_exponent=65537,
+        key_size=3072,
+    )
+
+    subject = x509.Name([
+        x509.NameAttribute(
+            NameOID.COMMON_NAME,
+            "cytech-comfort",
+        ),
+    ])
+
+    now = datetime.now(timezone.utc)
+
+    certificate = (
+        x509.CertificateBuilder()
+        .subject_name(subject)
+        .issuer_name(ca_certificate.subject)
+        .public_key(client_private_key.public_key())
+        .serial_number(x509.random_serial_number())
+        .not_valid_before(now - timedelta(minutes=5))
+        .not_valid_after(now + timedelta(days=365 * 10))
+        .add_extension(
+            x509.BasicConstraints(
+                ca=False,
+                path_length=None,
+            ),
+            critical=True,
+        )
+        .add_extension(
+            x509.KeyUsage(
+                digital_signature=True,
+                content_commitment=False,
+                key_encipherment=False,
+                data_encipherment=False,
+                key_agreement=False,
+                key_cert_sign=False,
+                crl_sign=False,
+                encipher_only=None,
+                decipher_only=None,
+            ),
+            critical=True,
+        )
+        .add_extension(
+            x509.ExtendedKeyUsage([
+                x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH
+            ]),
+            critical=False,
+        )
+        .sign(
+            private_key=ca_private_key,
+            algorithm=hashes.SHA256(),
+        )
+    )
+
+    CLIENT_KEY.write_bytes(
+        client_private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+    )
+
+    CLIENT_KEY.chmod(0o600)
+
+    CLIENT_CERT.write_bytes(
+        certificate.public_bytes(serialization.Encoding.PEM)
+    )
+
+    logger.info(
+        "Cytech Comfort MQTT client certificate generated successfully"
+    )
+
+
+
+
+def validate_signed_by_ca(cert_path: Path) -> None:
+    """
+    Verify that a certificate was signed by this installation's local CA.
+    """
+
+    if not CA_CERT.is_file():
+        raise RuntimeError(
+            f"CA certificate not found: {CA_CERT}"
+        )
+
+    if not cert_path.is_file():
+        raise RuntimeError(
+            f"Certificate not found: {cert_path}"
+        )
+
+    try:
+        ca_cert = x509.load_pem_x509_certificate(
             CA_CERT.read_bytes()
         )
 
-        server_private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=3072,
+        cert = x509.load_pem_x509_certificate(
+            cert_path.read_bytes()
         )
 
-        subject = x509.Name([
-            x509.NameAttribute(
-                NameOID.COMMON_NAME,
-                "core-mosquitto",
-            ),
-        ])
-
-        now = datetime.now(timezone.utc)
-
-        certificate = (
-            x509.CertificateBuilder()
-            .subject_name(subject)
-            .issuer_name(ca_certificate.subject)
-            .public_key(server_private_key.public_key())
-            .serial_number(x509.random_serial_number())
-            .not_valid_before(now - timedelta(minutes=5))
-            .not_valid_after(now + timedelta(days=365 * 10))
-            .add_extension(
-                x509.BasicConstraints(
-                    ca=False,
-                    path_length=None,
-                ),
-                critical=True,
-            )
-            .add_extension(
-                x509.KeyUsage(
-                    digital_signature=True,
-                    content_commitment=False,
-                    key_encipherment=True,
-                    data_encipherment=False,
-                    key_agreement=False,
-                    key_cert_sign=False,
-                    crl_sign=False,
-                    encipher_only=None,
-                    decipher_only=None,
-                ),
-                critical=True,
-            )
-            .add_extension(
-                x509.ExtendedKeyUsage([
-                    x509.oid.ExtendedKeyUsageOID.SERVER_AUTH
-                ]),
-                critical=False,
-            )
-            .add_extension(
-                x509.SubjectAlternativeName([
-                    x509.DNSName("core-mosquitto"),
-                ]),
-                critical=False,
-            )
-            .sign(
-                private_key=ca_private_key,
-                algorithm=hashes.SHA256(),
-            )
-        )
-
-        SERVER_KEY.write_bytes(
-            server_private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.PKCS8,
-                encryption_algorithm=serialization.NoEncryption(),
-            )
-        )
-
-        SERVER_KEY.chmod(0o600)
-
-        SERVER_CERT.write_bytes(
-            certificate.public_bytes(serialization.Encoding.PEM)
-        )
-
-        logger.info("Mosquitto MQTT server certificate generated successfully")
-
-
-    def generate_client_certificate() -> None:
-        """
-        Generate the Cytech Comfort MQTT client certificate and private key.
-
-        The certificate is signed by the installation-specific local CA
-        and is intended for MQTT mutual TLS client authentication.
-        """
-
-        ensure_certificate_directories()
-
-        if not CA_KEY.exists() or not CA_CERT.exists():
+        # Check that the certificate identifies our CA as its issuer.
+        if cert.issuer != ca_cert.subject:
             raise RuntimeError(
-                "Local CA does not exist; generate the CA before the client certificate"
+                f"Certificate issuer does not match local CA: {cert_path}"
             )
 
-        if CLIENT_KEY.exists() or CLIENT_CERT.exists():
-            raise RuntimeError(
-                "Client key or certificate already exists; refusing to overwrite it"
-            )
+        # Cryptographically verify the certificate signature.
+        ca_public_key = ca_cert.public_key()
 
-        logger.info("Generating Cytech Comfort MQTT client certificate")
-
-        # Load the installation-specific CA.
-        ca_private_key = serialization.load_pem_private_key(
-            CA_KEY.read_bytes(),
-            password=None,
+        ca_public_key.verify(
+            cert.signature,
+            cert.tbs_certificate_bytes,
+            padding.PKCS1v15(),
+            cert.signature_hash_algorithm,
         )
 
-        ca_certificate = x509.load_pem_x509_certificate(
-            CA_CERT.read_bytes()
-        )
+    except RuntimeError:
+        raise
 
-        # Generate a unique private key for this Comfort installation.
-        client_private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=3072,
-        )
-
-        subject = x509.Name([
-            x509.NameAttribute(
-                NameOID.COMMON_NAME,
-                "cytech-comfort",
-            ),
-        ])
-
-        now = datetime.now(timezone.utc)
-
-        certificate = (
-            x509.CertificateBuilder()
-            .subject_name(subject)
-            .issuer_name(ca_certificate.subject)
-            .public_key(client_private_key.public_key())
-            .serial_number(x509.random_serial_number())
-            .not_valid_before(now - timedelta(minutes=5))
-            .not_valid_after(now + timedelta(days=365 * 10))
-            .add_extension(
-                x509.BasicConstraints(
-                    ca=False,
-                    path_length=None,
-                ),
-                critical=True,
-            )
-            .add_extension(
-                x509.KeyUsage(
-                    digital_signature=True,
-                    content_commitment=False,
-                    key_encipherment=False,
-                    data_encipherment=False,
-                    key_agreement=False,
-                    key_cert_sign=False,
-                    crl_sign=False,
-                    encipher_only=None,
-                    decipher_only=None,
-                ),
-                critical=True,
-            )
-            .add_extension(
-                x509.ExtendedKeyUsage([
-                    x509.oid.ExtendedKeyUsageOID.CLIENT_AUTH
-                ]),
-                critical=False,
-            )
-            .sign(
-                private_key=ca_private_key,
-                algorithm=hashes.SHA256(),
-            )
-        )
-
-        CLIENT_KEY.write_bytes(
-            client_private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.PKCS8,
-                encryption_algorithm=serialization.NoEncryption(),
-            )
-        )
-
-        CLIENT_KEY.chmod(0o600)
-
-        CLIENT_CERT.write_bytes(
-            certificate.public_bytes(serialization.Encoding.PEM)
-        )
-
-        logger.info(
-            "Cytech Comfort MQTT client certificate generated successfully"
-        )
+    except Exception as exc:
+        raise RuntimeError(
+            f"Certificate signature verification failed: {cert_path}"
+        ) from exc
 
 
+def validate_certificate_set() -> None:
+    """
+    Validate the complete Cytech Comfort MQTT certificate set.
 
+    Checks:
+    - CA certificate is valid
+    - CA private key matches CA certificate
+    - Server certificate is valid
+    - Server private key matches server certificate
+    - Server certificate was signed by the local CA
+    - Client certificate is valid
+    - Client private key matches client certificate
+    - Client certificate was signed by the local CA
+    """
 
-    def validate_signed_by_ca(cert_path: Path) -> None:
-        """
-        Verify that a certificate was signed by this installation's local CA.
-        """
+    logger.info("Validating MQTT certificate set")
 
-        if not CA_CERT.is_file():
-            raise RuntimeError(
-                f"CA certificate not found: {CA_CERT}"
-            )
+    # Validate CA certificate and its private key.
+    validate_certificate(CA_CERT)
+    validate_key_matches_cert(CA_CERT, CA_KEY)
 
-        if not cert_path.is_file():
-            raise RuntimeError(
-                f"Certificate not found: {cert_path}"
-            )
+    # Validate Mosquitto server certificate.
+    validate_certificate(SERVER_CERT)
+    validate_key_matches_cert(SERVER_CERT, SERVER_KEY)
+    validate_signed_by_ca(SERVER_CERT)
 
-        try:
-            ca_cert = x509.load_pem_x509_certificate(
-                CA_CERT.read_bytes()
-            )
+    # Validate Cytech Comfort client certificate.
+    validate_certificate(CLIENT_CERT)
+    validate_key_matches_cert(CLIENT_CERT, CLIENT_KEY)
+    validate_signed_by_ca(CLIENT_CERT)
 
-            cert = x509.load_pem_x509_certificate(
-                cert_path.read_bytes()
-            )
-
-            # Check that the certificate identifies our CA as its issuer.
-            if cert.issuer != ca_cert.subject:
-                raise RuntimeError(
-                    f"Certificate issuer does not match local CA: {cert_path}"
-                )
-
-            # Cryptographically verify the certificate signature.
-            ca_public_key = ca_cert.public_key()
-
-            ca_public_key.verify(
-                cert.signature,
-                cert.tbs_certificate_bytes,
-                padding.PKCS1v15(),
-                cert.signature_hash_algorithm,
-            )
-
-        except RuntimeError:
-            raise
-
-        except Exception as exc:
-            raise RuntimeError(
-                f"Certificate signature verification failed: {cert_path}"
-            ) from exc
-
-
-    def validate_certificate_set() -> None:
-        """
-        Validate the complete Cytech Comfort MQTT certificate set.
-
-        Checks:
-        - CA certificate is valid
-        - CA private key matches CA certificate
-        - Server certificate is valid
-        - Server private key matches server certificate
-        - Server certificate was signed by the local CA
-        - Client certificate is valid
-        - Client private key matches client certificate
-        - Client certificate was signed by the local CA
-        """
-
-        logger.info("Validating MQTT certificate set")
-
-        # Validate CA certificate and its private key.
-        validate_certificate(CA_CERT)
-        validate_key_matches_cert(CA_CERT, CA_KEY)
-
-        # Validate Mosquitto server certificate.
-        validate_certificate(SERVER_CERT)
-        validate_key_matches_cert(SERVER_CERT, SERVER_KEY)
-        validate_signed_by_ca(SERVER_CERT)
-
-        # Validate Cytech Comfort client certificate.
-        validate_certificate(CLIENT_CERT)
-        validate_key_matches_cert(CLIENT_CERT, CLIENT_KEY)
-        validate_signed_by_ca(CLIENT_CERT)
-
-        logger.info("MQTT certificate set validation successful")
+    logger.info("MQTT certificate set validation successful")
 
 
 def ensure_certificate_set() -> None:
@@ -542,15 +542,15 @@ def ensure_certificate_set() -> None:
     )
 
 
-    if __name__ == "__main__":
-        logging.basicConfig(
-            level=logging.INFO,
-            format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
-        )
+if __name__ == "__main__":
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
+    )
 
-        try:
-            ensure_certificate_set()
-            logger.info("Certificate setup completed successfully")
-        except Exception:
+    try:
+        ensure_certificate_set()
+        logger.info("Certificate setup completed successfully")
+    except Exception:
             logger.exception("Certificate setup failed")
             raise
