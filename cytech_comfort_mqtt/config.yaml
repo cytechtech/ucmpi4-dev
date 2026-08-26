@@ -1,6 +1,6 @@
 name: "Cytech Comfort"
 description: "Cytech Comfort MQTT Bridge"
-version: "1.0.8-dev5"
+version: "1.0.8-dev6"
 slug: "cytech_comfort_mqtt"
 init: false
 startup: application
@@ -34,7 +34,8 @@ services:
 
 map:
   - addon_config
-  - ssl
+  - type: ssl
+    read_only: false
 
 options:
   comfort_serial_mode: UCMA/Pi & CM4Pi on CM9001
