@@ -14,7 +14,8 @@ in Home Assistant's shared /ssl directory.
 from datetime import datetime, timedelta, timezone
 
 from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization, rsa, padding
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import rsa, padding
 from cryptography.x509.oid import NameOID
 from pathlib import Path
 import logging
