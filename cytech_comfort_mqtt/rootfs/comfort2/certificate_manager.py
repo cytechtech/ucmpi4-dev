@@ -483,26 +483,40 @@ def ensure_certificate_set() -> None:
     """
     Ensure that this installation has a complete MQTT certificate set.
 
-    A completely new installation receives a new local CA, Mosquitto
-    server certificate and Cytech Comfort client certificate.
+    Behaviour:
+      - Complete certificate set:
+          Validate it and leave it unchanged.
 
-    Existing complete certificate sets are left untouched.
+      - No certificate files:
+          Generate a new installation-specific CA, server certificate,
+          and client certificate.
 
-    A partial certificate set is treated as an error so that existing
-    cryptographic material is never silently replaced.
+      - Valid CA exists but server/client certificates are missing:
+          Recover safely by generating the missing certificate pairs
+          using the existing CA.
+
+      - Partial certificate/key pair or incomplete CA:
+          Stop rather than replacing existing cryptographic material.
     """
 
     ensure_certificate_directories()
 
     status = certificate_status()
 
-    # Complete certificate set already exists.
+    # ------------------------------------------------------------
+    # 1. Complete certificate set already exists
+    # ------------------------------------------------------------
     if all(status.values()):
         logger.info("MQTT certificate set already exists")
+
         validate_certificate_set()
+
+        logger.info("Existing MQTT certificate set validated successfully")
         return
 
-    # Nothing exists: this is a new certificate installation.
+    # ------------------------------------------------------------
+    # 2. Nothing exists - completely new installation
+    # ------------------------------------------------------------
     if not any(status.values()):
         logger.info(
             "No MQTT certificates found - generating new certificate set"
@@ -514,10 +528,76 @@ def ensure_certificate_set() -> None:
 
         validate_certificate_set()
 
-        logger.info("MQTT certificate set generated successfully")
+        logger.info(
+            "MQTT certificate set generated and validated successfully"
+        )
         return
 
-    # Some files exist but others are missing.
+    # ------------------------------------------------------------
+    # 3. CA exists - possible interrupted certificate generation
+    # ------------------------------------------------------------
+    if status["ca_key"] and status["ca_cert"]:
+        logger.warning(
+            "Incomplete MQTT certificate set found - "
+            "attempting safe recovery using existing local CA"
+        )
+
+        # Never use the existing CA unless its certificate is valid
+        # and its private key matches.
+        validate_certificate(CA_CERT)
+        validate_key_matches_cert(CA_CERT, CA_KEY)
+
+        # --------------------------------------------------------
+        # Mosquitto server certificate
+        # --------------------------------------------------------
+
+        # A certificate without its key (or vice versa) is not safe
+        # to repair automatically.
+        if status["server_key"] != status["server_cert"]:
+            raise RuntimeError(
+                "Incomplete Mosquitto server certificate/key pair detected; "
+                "automatic recovery has been stopped"
+            )
+
+        # Neither exists, so safely generate a new pair using
+        # the existing installation CA.
+        if not status["server_key"]:
+            logger.info(
+                "Mosquitto server certificate not found - generating it"
+            )
+            generate_server_certificate()
+
+        # --------------------------------------------------------
+        # Cytech Comfort client certificate
+        # --------------------------------------------------------
+
+        if status["client_key"] != status["client_cert"]:
+            raise RuntimeError(
+                "Incomplete Comfort client certificate/key pair detected; "
+                "automatic recovery has been stopped"
+            )
+
+        if not status["client_key"]:
+            logger.info(
+                "Comfort MQTT client certificate not found - generating it"
+            )
+            generate_client_certificate()
+
+        # --------------------------------------------------------
+        # Validate the completed/recovered certificate set
+        # --------------------------------------------------------
+
+        validate_certificate_set()
+
+        logger.info(
+            "MQTT certificate set recovery completed successfully"
+        )
+        return
+
+    # ------------------------------------------------------------
+    # 4. Something exists, but there is not a complete CA
+    # ------------------------------------------------------------
+
     missing = [
         name
         for name, exists in status.items()
@@ -537,8 +617,8 @@ def ensure_certificate_set() -> None:
     )
 
     raise RuntimeError(
-        "Incomplete MQTT certificate set detected; "
-        "automatic certificate generation has been stopped"
+        "Incomplete MQTT certificate set detected and a complete local CA "
+        "is not available; automatic certificate generation has been stopped"
     )
 
 
