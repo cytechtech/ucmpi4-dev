@@ -1147,13 +1147,12 @@ def ensure_certificate_set() -> None:
         "is not available; automatic certificate generation has been stopped"
     )
 
-
 def get_home_assistant_ipv4() -> ipaddress.IPv4Address:
     """
     Return the primary Home Assistant host IPv4 address.
 
-    The address is obtained from the Home Assistant Supervisor network API,
-    not from the add-on container's own Docker address.
+    Supports both current and older Supervisor /network/info
+    response formats.
     """
 
     token = os.getenv("SUPERVISOR_TOKEN")
@@ -1178,42 +1177,87 @@ def get_home_assistant_ipv4() -> ipaddress.IPv4Address:
 
         interfaces = data.get("interfaces", [])
 
-        for interface in interfaces:
-            if not interface.get("primary"):
-                continue
+        # --------------------------------------------------------
+        # Current Supervisor format:
+        #
+        # "interfaces": [
+        #     {
+        #         "interface": "eth0",
+        #         "primary": true,
+        #         "enabled": true,
+        #         "connected": true,
+        #         "ipv4": {
+        #             "ip_address": "192.168.1.100/24"
+        #         }
+        #     }
+        # ]
+        # --------------------------------------------------------
 
-            if not interface.get("enabled", True):
-                continue
+        if isinstance(interfaces, list):
+            for interface in interfaces:
+                if not interface.get("primary"):
+                    continue
 
-            if not interface.get("connected", True):
-                continue
+                if not interface.get("enabled", True):
+                    continue
 
-            ipv4 = interface.get("ipv4")
+                if not interface.get("connected", True):
+                    continue
 
-            if not ipv4:
-                continue
+                ipv4 = interface.get("ipv4")
 
-            address = ipv4.get("ip_address")
+                if not ipv4:
+                    continue
 
-            if not address:
-                continue
+                address = ipv4.get("ip_address")
 
-            # Supervisor returns an address such as:
-            # 192.168.1.50/24
-            return ipaddress.ip_interface(address).ip
+                # Some Supervisor versions use "address".
+                if not address:
+                    address_list = ipv4.get("address")
+
+                    if isinstance(address_list, list) and address_list:
+                        address = address_list[0]
+                    elif isinstance(address_list, str):
+                        address = address_list
+
+                if address:
+                    return ipaddress.ip_interface(address).ip
+
+        # --------------------------------------------------------
+        # Older Supervisor format:
+        #
+        # "interfaces": {
+        #     "eth0": {
+        #         "ip_address": "192.168.1.100/24",
+        #         "primary": true
+        #     }
+        # }
+        # --------------------------------------------------------
+
+        elif isinstance(interfaces, dict):
+            for interface_name, interface in interfaces.items():
+                if not interface.get("primary"):
+                    continue
+
+                address = interface.get("ip_address")
+
+                if address:
+                    return ipaddress.ip_interface(address).ip
 
     except Exception as exc:
         raise RuntimeError(
             "Unable to determine Home Assistant primary IPv4 address"
         ) from exc
 
+
+        logger.error(
+            "Supervisor network interfaces returned: %r",
+            interfaces,
+        )
+
     raise RuntimeError(
         "No active primary Home Assistant IPv4 interface was found"
     )
-
-
-
-
 
 
 
