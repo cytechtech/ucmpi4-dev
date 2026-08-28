@@ -1223,9 +1223,17 @@ if __name__ == "__main__":
         format="%(asctime)s %(levelname)s [%(name)s] %(message)s",
     )
 
+    # try:
+    #     ensure_certificate_set()
+    #     logger.info("Certificate setup completed successfully")
+
     try:
         ensure_certificate_set()
-        logger.info("Certificate setup completed successfully")
+
+        logger.info("TEST: forcing Mosquitto server certificate renewal")
+        renew_server_certificate()
+
+        logger.info("Certificate renewal test completed successfully")
     except Exception:
         logger.exception("Certificate setup failed")
         raise
