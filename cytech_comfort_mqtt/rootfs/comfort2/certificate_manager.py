@@ -1038,6 +1038,25 @@ def ensure_certificate_set() -> None:
         validate_certificate_set()
 
         logger.info("Existing MQTT certificate set validated successfully")
+
+        # Check that the Mosquitto server certificate still represents
+        # the current Home Assistant network identity.
+        if not server_certificate_matches_current_network():
+            logger.warning(
+                "Mosquitto server certificate does not match the current "
+                "Home Assistant network identity - renewing server certificate"
+            )
+
+            renew_server_certificate()
+
+            # Validate the complete certificate set again after renewal.
+            validate_certificate_set()
+
+            logger.info(
+                "MQTT certificate set validated successfully after "
+                "server certificate renewal"
+            )
+
         return
 
     # ------------------------------------------------------------
