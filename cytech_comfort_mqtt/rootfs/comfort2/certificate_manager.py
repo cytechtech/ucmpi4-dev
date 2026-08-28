@@ -1250,10 +1250,10 @@ def get_home_assistant_ipv4() -> ipaddress.IPv4Address:
         ) from exc
 
 
-        logger.error(
-            "Supervisor network interfaces returned: %r",
-            interfaces,
-        )
+    logger.error(
+        "Supervisor network interfaces returned: %r",
+        interfaces,
+    )
 
     raise RuntimeError(
         "No active primary Home Assistant IPv4 interface was found"
