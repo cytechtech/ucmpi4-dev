@@ -53,7 +53,7 @@ import settings
 from cclx_parser import parse_cclx
 from options import load_options, get_str, get_int, get_bool
 from mqtt_tls import configure_client_tls
-from certificate_manager import ensure_certificate_set
+from certificate_manager import ensure_certificate_set, renew_server_certificate
 import comfort_protocol
 from passthrough import ComfortPassthroughServer
 
@@ -3442,6 +3442,10 @@ def main():
 
     try:
         ensure_certificate_set()
+
+        logger.warning("TEST: forcing Mosquitto server certificate renewal")
+        renew_server_certificate()
+
     except Exception:
         logger.exception("MQTT certificate setup failed")
         raise
