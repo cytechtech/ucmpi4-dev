@@ -75,7 +75,7 @@ MQTTPASSWORD = "comfortHA"
 MQTTPROTOCOL = "TCP"
 
 # MQTT TLS settings
-MQTT_TLS_ENABLED = False
+MQTT_TLS_ENABLED = True
 MQTT_MUTUAL_TLS = False
 
 MQTTBROKER = "core-mosquitto"
