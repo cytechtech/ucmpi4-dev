@@ -136,10 +136,6 @@ def deploy_mosquitto_tls_files() -> None:
         "Mosquitto TLS certificate/key and configuration deployed successfully"
     )
 
-
-
-
-
 def generate_ca() -> None:
     """
     Generate the installation-specific MQTT Certificate Authority.
@@ -460,8 +456,6 @@ def generate_client_certificate() -> None:
     )
 
 
-
-
 def validate_signed_by_ca(cert_path: Path) -> None:
     """
     Verify that a certificate was signed by this installation's local CA.
@@ -617,7 +611,6 @@ def write_temporary_server_certificate(
     cert_path.write_bytes(
         certificate.public_bytes(serialization.Encoding.PEM)
     )
-
 
 
 def renew_server_certificate() -> None:
@@ -804,7 +797,6 @@ def renew_server_certificate() -> None:
         temp_key.unlink(missing_ok=True)
 
 
-
 def server_certificate_matches_current_network() -> bool:
     """
     Return True if the Mosquitto server certificate contains the current
@@ -864,10 +856,6 @@ def server_certificate_matches_current_network() -> bool:
     )
 
     return True
-
-
-
-
 
 
 def validate_certificate_set() -> None:
@@ -1052,14 +1040,21 @@ def recover_interrupted_server_renewal() -> None:
     )
 
 
-
-def ensure_certificate_set() -> None:
+def ensure_certificate_set() -> bool:
     """
     Ensure that this installation has a complete MQTT certificate set.
 
+    Returns:
+        True if the Mosquitto server certificate was generated or renewed
+        during this call.
+
+        False if the existing Mosquitto server certificate was already valid
+        and did not need to be changed.
+
     Behaviour:
       - Complete certificate set:
-          Validate it and leave it unchanged.
+          Validate it and leave it unchanged unless the server certificate
+          no longer matches the current Home Assistant network identity.
 
       - No certificate files:
           Generate a new installation-specific CA, server certificate,
@@ -1072,6 +1067,7 @@ def ensure_certificate_set() -> None:
       - Partial certificate/key pair or incomplete CA:
           Stop rather than replacing existing cryptographic material.
     """
+
     ensure_certificate_directories()
 
     # Recover any server certificate renewal that was interrupted by
@@ -1108,7 +1104,9 @@ def ensure_certificate_set() -> None:
                 "server certificate renewal"
             )
 
-        return
+            return True
+
+        return False
 
     # ------------------------------------------------------------
     # 2. Nothing exists - completely new installation
@@ -1127,7 +1125,8 @@ def ensure_certificate_set() -> None:
         logger.info(
             "MQTT certificate set generated and validated successfully"
         )
-        return
+
+        return True
 
     # ------------------------------------------------------------
     # 3. CA exists - possible interrupted certificate generation
@@ -1142,6 +1141,8 @@ def ensure_certificate_set() -> None:
         # and its private key matches.
         validate_certificate(CA_CERT)
         validate_key_matches_cert(CA_CERT, CA_KEY)
+
+        server_certificate_created = False
 
         # --------------------------------------------------------
         # Mosquitto server certificate
@@ -1162,6 +1163,7 @@ def ensure_certificate_set() -> None:
                 "Mosquitto server certificate not found - generating it"
             )
             generate_server_certificate()
+            server_certificate_created = True
 
         # --------------------------------------------------------
         # Cytech Comfort client certificate
@@ -1188,7 +1190,8 @@ def ensure_certificate_set() -> None:
         logger.info(
             "MQTT certificate set recovery completed successfully"
         )
-        return
+
+        return server_certificate_created
 
     # ------------------------------------------------------------
     # 4. Something exists, but there is not a complete CA
@@ -1216,6 +1219,7 @@ def ensure_certificate_set() -> None:
         "Incomplete MQTT certificate set detected and a complete local CA "
         "is not available; automatic certificate generation has been stopped"
     )
+
 
 def get_home_assistant_ipv4() -> ipaddress.IPv4Address:
     """
