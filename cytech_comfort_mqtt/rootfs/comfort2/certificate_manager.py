@@ -45,7 +45,11 @@ SERVER_CERT = SSL_CERT_DIR / "mqtt-server.crt"
 # Cytech Comfort MQTT client
 CLIENT_KEY = SSL_CERT_DIR / "comfort-client.key"
 CLIENT_CERT = SSL_CERT_DIR / "comfort-client.crt"
-
+# Mosquitto custom TLS deployment directory
+MOSQUITTO_TLS_DIR = Path("/share/mosquitto")
+MOSQUITTO_SERVER_CERT = MOSQUITTO_TLS_DIR / "mqtt-server.crt"
+MOSQUITTO_SERVER_KEY = MOSQUITTO_TLS_DIR / "mqtt-server.key"
+MOSQUITTO_TLS_CONFIG = MOSQUITTO_TLS_DIR / "tls.conf"
 
 def ensure_certificate_directories() -> None:
     """Create the certificate directories if they do not already exist."""
@@ -88,6 +92,53 @@ def certificate_status() -> dict[str, bool]:
         "client_key": CLIENT_KEY.is_file(),
         "client_cert": CLIENT_CERT.is_file(),
     }
+
+def deploy_mosquitto_tls_files() -> None:
+    """
+    Deploy the validated MQTT server certificate/key and TLS configuration
+    to the Home Assistant Mosquitto custom configuration directory.
+
+    The authoritative certificate/key remain in /ssl/cytech_comfort.
+    The files in /share/mosquitto are deployment copies used by Mosquitto.
+    """
+
+    # Never deploy an invalid or mismatched server certificate/key pair.
+    validate_certificate(SERVER_CERT)
+    validate_key_matches_cert(SERVER_CERT, SERVER_KEY)
+    validate_signed_by_ca(SERVER_CERT)
+
+    MOSQUITTO_TLS_DIR.mkdir(
+        parents=True,
+        exist_ok=True,
+    )
+
+    MOSQUITTO_SERVER_CERT.write_bytes(
+        SERVER_CERT.read_bytes()
+    )
+
+    MOSQUITTO_SERVER_KEY.write_bytes(
+        SERVER_KEY.read_bytes()
+    )
+    MOSQUITTO_SERVER_KEY.chmod(0o600)
+
+    MOSQUITTO_TLS_CONFIG.write_text(
+        "listener 8883\n"
+        "protocol mqtt\n"
+        "\n"
+        "certfile /share/mosquitto/mqtt-server.crt\n"
+        "keyfile /share/mosquitto/mqtt-server.key\n"
+        "\n"
+        "require_certificate false\n",
+        encoding="utf-8",
+    )
+
+    logger.info(
+        "Mosquitto TLS certificate/key and configuration deployed successfully"
+    )
+
+
+
+
 
 def generate_ca() -> None:
     """
