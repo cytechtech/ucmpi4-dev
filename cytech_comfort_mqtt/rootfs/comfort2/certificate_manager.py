@@ -1221,6 +1221,44 @@ def ensure_certificate_set() -> bool:
     )
 
 
+def restart_mosquitto() -> None:
+    """
+    Restart the Home Assistant Mosquitto broker add-on through the
+    Supervisor API.
+
+    This is required after deploying a newly generated or renewed
+    Mosquitto server certificate so that Mosquitto loads the new files.
+    """
+
+    token = os.getenv("SUPERVISOR_TOKEN")
+
+    if not token:
+        raise RuntimeError("SUPERVISOR_TOKEN is not available")
+
+    headers = {
+        "Authorization": f"Bearer {token}"
+    }
+
+    logger.info("Restarting Mosquitto broker to load new TLS certificate")
+
+    try:
+        response = requests.post(
+            "http://supervisor/addons/core_mosquitto/restart",
+            headers=headers,
+            timeout=30,
+        )
+
+        response.raise_for_status()
+
+    except Exception as exc:
+        raise RuntimeError(
+            "Unable to restart Mosquitto broker through Supervisor"
+        ) from exc
+
+    logger.info("Mosquitto broker restart requested successfully")
+
+
+
 def get_home_assistant_ipv4() -> ipaddress.IPv4Address:
     """
     Return the primary Home Assistant host IPv4 address.

@@ -53,7 +53,7 @@ import settings
 from cclx_parser import parse_cclx
 from options import load_options, get_str, get_int, get_bool
 from mqtt_tls import configure_client_tls
-from certificate_manager import ensure_certificate_set,deploy_mosquitto_tls_files
+from certificate_manager import ensure_certificate_set,deploy_mosquitto_tls_files,restart_mosquitto
 import comfort_protocol
 from passthrough import ComfortPassthroughServer
 
@@ -3439,11 +3439,20 @@ def main():
     MQTT_VERSION = mqtt.MQTTv5
 
     logger.info("Checking MQTT certificate installation")
+
     try:
-        ensure_certificate_set()
+        server_certificate_changed = ensure_certificate_set()
 
         logger.info("Deploying MQTT TLS files to Mosquitto")
         deploy_mosquitto_tls_files()
+
+        if server_certificate_changed:
+            logger.info(
+                "Mosquitto server certificate changed; "
+                "restarting Mosquitto"
+            )
+
+            restart_mosquitto()
 
     except Exception:
         logger.exception("MQTT certificate setup failed")
