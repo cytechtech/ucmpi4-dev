@@ -166,14 +166,56 @@ if settings.PASSTHROUGH_ENABLED:
 else:
     logger.info("Comfort Passthrough Server disabled")
    
-    
-# settings.MQTTBROKER = get_str(_opts, "mqtt_broker_address", "core-mosquitto")
-# settings.MQTTPORT = get_int(_opts, "mqtt_broker_port", 1883)
-# settings.MQTTUSERNAME = get_str(_opts, "mqtt_user", None)
-# settings.MQTTPASSWORD = get_str(_opts, "mqtt_password", None)
-# settings.MQTTPROTOCOL = get_str(_opts, "mqtt_protocol", "TCP")
-# #Optional resolved broker IP for diagnostics
-# settings.MQTTBROKERIP = get_ip_address(settings.MQTTBROKER)
+
+# MQTT
+
+settings.MQTTUSERNAME = get_str(
+    _opts,
+    "mqtt_user",
+    settings.MQTTUSERNAME,
+)
+
+settings.MQTTPASSWORD = get_str(
+    _opts,
+    "mqtt_password",
+    settings.MQTTPASSWORD,
+)
+
+settings.MQTT_SECURITY = get_str(
+    _opts,
+    "mqtt_security",
+    "password",
+).strip().lower()
+
+if settings.MQTT_SECURITY not in {
+    "password",
+    "tls",
+    "mutual_tls",
+}:
+    raise RuntimeError(
+        f"Invalid MQTT security mode: {settings.MQTT_SECURITY}"
+    )
+
+settings.MQTT_TLS_ENABLED = settings.MQTT_SECURITY in {
+    "tls",
+    "mutual_tls",
+}
+
+settings.MQTT_MUTUAL_TLS = (
+    settings.MQTT_SECURITY == "mutual_tls"
+)
+
+settings.MQTTPORT = (
+    8883
+    if settings.MQTT_TLS_ENABLED
+    else 1883
+)
+
+# Optional resolved broker IP for diagnostics
+settings.MQTTBROKERIP = get_ip_address(
+    settings.MQTTBROKER
+)
+
 
 
 # Comfort

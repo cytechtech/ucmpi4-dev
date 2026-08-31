@@ -69,6 +69,7 @@ rand_int = lower + secrets.randbelow(upper - lower + 1)
 rand_hex_str = hex(rand_int)
 mqtt_client_id = DOMAIN+"-"+str(rand_hex_str[2:])       # Generate pseudo random client-id each time it starts.
 
+# Some MQTT settings are populated from options at runtime - these are fallback defaults
 MQTTUSERNAME = "comfortHA"
 MQTTPASSWORD = "comfortHA"
 
