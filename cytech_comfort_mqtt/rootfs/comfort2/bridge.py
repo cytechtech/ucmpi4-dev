@@ -3441,15 +3441,14 @@ def main():
     logger.info("Checking MQTT certificate installation")
 
     try:
-        server_certificate_changed = ensure_certificate_set()
+        ensure_certificate_set()
 
-        logger.info("Deploying MQTT TLS files to Mosquitto")
-        deploy_mosquitto_tls_files()
+        logger.info("Checking MQTT TLS deployment")
+        mosquitto_tls_changed = deploy_mosquitto_tls_files()
 
-   
-        if server_certificate_changed:
+        if mosquitto_tls_changed:
             logger.info(
-                "Mosquitto server certificate changed; "
+                "Mosquitto TLS deployment changed; "
                 "restarting Mosquitto"
             )
 

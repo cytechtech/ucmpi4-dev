@@ -93,13 +93,20 @@ def certificate_status() -> dict[str, bool]:
         "client_cert": CLIENT_CERT.is_file(),
     }
 
-def deploy_mosquitto_tls_files() -> None:
+
+def deploy_mosquitto_tls_files() -> bool:
     """
     Deploy the validated MQTT server certificate/key and TLS configuration
     to the Home Assistant Mosquitto custom configuration directory.
 
     The authoritative certificate/key remain in /ssl/cytech_comfort.
     The files in /share/mosquitto are deployment copies used by Mosquitto.
+
+    Returns:
+        True if any Mosquitto TLS deployment file was created or changed.
+
+        False if the deployed files already exactly match the required
+        certificate, key, and configuration.
     """
 
     # Never deploy an invalid or mismatched server certificate/key pair.
@@ -112,29 +119,84 @@ def deploy_mosquitto_tls_files() -> None:
         exist_ok=True,
     )
 
-    MOSQUITTO_SERVER_CERT.write_bytes(
-        SERVER_CERT.read_bytes()
-    )
-
-    MOSQUITTO_SERVER_KEY.write_bytes(
-        SERVER_KEY.read_bytes()
-    )
-    MOSQUITTO_SERVER_KEY.chmod(0o600)
-
-    MOSQUITTO_TLS_CONFIG.write_text(
+    required_config = (
         "listener 8883\n"
         "protocol mqtt\n"
         "\n"
         "certfile /share/mosquitto/mqtt-server.crt\n"
         "keyfile /share/mosquitto/mqtt-server.key\n"
         "\n"
-        "require_certificate false\n",
-        encoding="utf-8",
+        "require_certificate false\n"
     )
 
-    logger.info(
-        "Mosquitto TLS certificate/key and configuration deployed successfully"
-    )
+    source_cert = SERVER_CERT.read_bytes()
+    source_key = SERVER_KEY.read_bytes()
+
+    deployment_changed = False
+
+    # ------------------------------------------------------------
+    # Server certificate
+    # ------------------------------------------------------------
+
+    if (
+        not MOSQUITTO_SERVER_CERT.is_file()
+        or MOSQUITTO_SERVER_CERT.read_bytes() != source_cert
+    ):
+        MOSQUITTO_SERVER_CERT.write_bytes(source_cert)
+        deployment_changed = True
+
+        logger.info(
+            "Mosquitto TLS server certificate deployed"
+        )
+
+    # ------------------------------------------------------------
+    # Server private key
+    # ------------------------------------------------------------
+
+    if (
+        not MOSQUITTO_SERVER_KEY.is_file()
+        or MOSQUITTO_SERVER_KEY.read_bytes() != source_key
+    ):
+        MOSQUITTO_SERVER_KEY.write_bytes(source_key)
+        deployment_changed = True
+
+        logger.info(
+            "Mosquitto TLS server private key deployed"
+        )
+
+    # Always enforce the required private-key permissions.
+    MOSQUITTO_SERVER_KEY.chmod(0o600)
+
+    # ------------------------------------------------------------
+    # Mosquitto TLS configuration
+    # ------------------------------------------------------------
+
+    if (
+        not MOSQUITTO_TLS_CONFIG.is_file()
+        or MOSQUITTO_TLS_CONFIG.read_text(encoding="utf-8")
+        != required_config
+    ):
+        MOSQUITTO_TLS_CONFIG.write_text(
+            required_config,
+            encoding="utf-8",
+        )
+        deployment_changed = True
+
+        logger.info(
+            "Mosquitto TLS configuration deployed"
+        )
+
+    if deployment_changed:
+        logger.info(
+            "Mosquitto TLS deployment changed"
+        )
+    else:
+        logger.info(
+            "Mosquitto TLS deployment already up to date"
+        )
+
+    return deployment_changed
+
 
 def generate_ca() -> None:
     """
@@ -1088,8 +1150,8 @@ def ensure_certificate_set() -> bool:
 
         # Check that the Mosquitto server certificate still represents
         # the current Home Assistant network identity.
-        if True:
-        #if not server_certificate_matches_current_network():
+
+        if not server_certificate_matches_current_network():
             logger.warning(
                 "Mosquitto server certificate does not match the current "
                 "Home Assistant network identity - renewing server certificate"
