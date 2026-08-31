@@ -1,6 +1,6 @@
 name: "Cytech Comfort"
 description: "Cytech Comfort MQTT Bridge"
-version: "1.0.8-dev21"
+version: "1.0.8-dev22"
 slug: "cytech_comfort_mqtt"
 init: false
 startup: application
@@ -14,6 +14,7 @@ panel_icon: "mdi:alarm-panel-outline"
 codenotary: notary@home-assistant.io
 url: "https://github.com/cytechtech/ucmpi4"
 hassio_api: true
+hassio_role: manager
 uart: true
 host_network: true
 devices:
