@@ -1088,7 +1088,8 @@ def ensure_certificate_set() -> bool:
 
         # Check that the Mosquitto server certificate still represents
         # the current Home Assistant network identity.
-        if not server_certificate_matches_current_network():
+        if True:
+        #if not server_certificate_matches_current_network():
             logger.warning(
                 "Mosquitto server certificate does not match the current "
                 "Home Assistant network identity - renewing server certificate"
