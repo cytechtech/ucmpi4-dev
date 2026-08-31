@@ -3446,6 +3446,8 @@ def main():
         logger.info("Deploying MQTT TLS files to Mosquitto")
         deploy_mosquitto_tls_files()
 
+        restart_mosquitto()
+
         if server_certificate_changed:
             logger.info(
                 "Mosquitto server certificate changed; "
