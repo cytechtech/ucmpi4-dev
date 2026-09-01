@@ -1391,11 +1391,6 @@ def restart_mosquitto() -> None:
     Used after changes to Mosquitto configuration, credentials,
     or TLS deployment that require the broker to reload its state.
     """
-    raise RuntimeError(
-        "TEST: simulated Mosquitto restart failure"
-    )
-
-
 
     token = os.getenv("SUPERVISOR_TOKEN")
 
