@@ -83,8 +83,10 @@ LOCK_FILE = DATA_DIR / ".apply.lock"
 RELOAD_FLAG = DATA_DIR / "reload.flag"
 UPLOAD_META = DATA_DIR / "upload.meta.json"
 
+
 DATA_DIR.mkdir(parents=True, exist_ok=True)
 RAM_LOG_FILE = Path("/dev/shm/cytech_comfort_mqtt.log")
+CA_CERT_FILE = Path("/ssl/cytech_comfort/ca.crt")
 
 app = Flask(__name__)
 
@@ -470,16 +472,18 @@ def home():
 """
 
     body = f"""
-{passthrough_html}
 
 <div class="card">
-  <div><strong>Logs</strong></div>
-  <div>View the live RAM log for bridge, web UI and passthrough activity.</div>
+  <div><strong>Cytech Comfort Add-on</strong></div>
+
   <div class="row" style="margin-top:10px;">
-    <a class="btn btn-primary" href="{url_for('view_log')}">Open Logs</a>
-    <a class="btn" href="{url_for('download_log')}">Download Full Log</a>
+    <a class="btn btn-primary" href="{url_for('home')}">CCLX</a>
+    <a class="btn" href="{url_for('view_log')}">Logs</a>
+    <a class="btn" href="{url_for('view_mqtt')}">MQTT</a>
   </div>
 </div>
+
+{passthrough_html}
 
 <div class="card">
   <div><strong>3) CCLX Configuration</strong></div>
@@ -805,22 +809,52 @@ def view_mqtt():
 
   <p>
     Other MQTT applications connecting securely to this broker on
-    port 8883 may need the CA certificate so that they can verify
-    the broker certificate.
+    port 8883 may need this CA certificate so that they can verify
+    the Mosquitto broker certificate.
   </p>
 
-  <p>
-    The CA certificate can be downloaded from this page.
-  </p>
+  <div class="row" style="margin-top:12px;">
+    <a class="btn btn-primary"
+       href="{url_for('download_ca_certificate')}">
+      Download CA Certificate
+    </a>
+  </div>
 
-  <div class="warn">
+  <div class="warn" style="margin-top:12px;">
     Only the public CA certificate is provided. Private certificate
-    keys are not made available through the Web UI.
+    keys are not available through the Web UI.
   </div>
 </div>
 """
 
     return _html("Cytech Comfort MQTT", body)
+
+
+
+@app.get("/mqtt/ca/download")
+def download_ca_certificate():
+    if not CA_CERT_FILE.is_file():
+        return _html(
+            "CA Certificate",
+            f"""
+<p class="err">
+  The Cytech Comfort CA certificate has not been created yet.
+</p>
+
+<p>
+  <a href="{url_for('view_mqtt')}">Back to MQTT</a>
+</p>
+"""
+        ), 404
+
+    return send_file(
+        str(CA_CERT_FILE),
+        as_attachment=True,
+        download_name="cytech-comfort-ca.crt",
+        mimetype="application/x-x509-ca-cert",
+        conditional=True,
+    )
+
 
 
 
