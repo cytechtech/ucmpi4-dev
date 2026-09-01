@@ -741,6 +741,89 @@ def rollback():
     return _html("Rollback", f"<p class='ok'>Rollback complete at {_now()}.</p><p><a href='{url_for('home')}'>Back</a></p>")
 
 
+@app.get("/mqtt")
+def view_mqtt():
+    mqtt_security = get_str(
+        _opts,
+        "mqtt_security",
+        "password",
+    ).strip().lower()
+
+    mqtt_port = 8883 if mqtt_security in {
+        "tls",
+        "mutual_tls",
+    } else 1883
+
+    mode_names = {
+        "password": "Password",
+        "tls": "TLS",
+        "mutual_tls": "Mutual TLS",
+    }
+
+    mode_text = mode_names.get(
+        mqtt_security,
+        mqtt_security,
+    )
+
+    body = f"""
+<div class="card">
+  <div><strong>Cytech Comfort Add-on</strong></div>
+
+  <div class="row" style="margin-top:10px;">
+    <a class="btn" href="{url_for('home')}">CCLX</a>
+    <a class="btn" href="{url_for('view_log')}">Logs</a>
+    <a class="btn btn-primary" href="{url_for('view_mqtt')}">MQTT</a>
+  </div>
+</div>
+
+<div class="card">
+  <div><strong>MQTT Security</strong></div>
+
+  <p>
+    The Cytech Comfort add-on can connect to the Mosquitto MQTT
+    broker using password authentication, TLS, or mutual TLS.
+  </p>
+
+  <div>
+    Current Comfort MQTT security mode:
+    <span class="pill">{html.escape(mode_text)}</span>
+  </div>
+
+  <div style="margin-top:8px;">
+    MQTT port: <code>{mqtt_port}</code>
+  </div>
+</div>
+
+<div class="card">
+  <div><strong>CA Certificate</strong></div>
+
+  <p>
+    When TLS is enabled, the Mosquitto broker uses a certificate
+    issued by a certificate authority unique to this Home Assistant
+    installation.
+  </p>
+
+  <p>
+    Other MQTT applications connecting securely to this broker on
+    port 8883 may need the CA certificate so that they can verify
+    the broker certificate.
+  </p>
+
+  <p>
+    The CA certificate can be downloaded from this page.
+  </p>
+
+  <div class="warn">
+    Only the public CA certificate is provided. Private certificate
+    keys are not made available through the Web UI.
+  </div>
+</div>
+"""
+
+    return _html("Cytech Comfort MQTT", body)
+
+
+
 @app.get("/log/raw")
 def raw_log():
     if not RAM_LOG_FILE.exists():
@@ -768,9 +851,10 @@ def view_log():
 <div class="card">
   <div><strong>Cytech Comfort Add-on</strong></div>
   <div class="row" style="margin-top:10px;">
-    <a class="btn" href="{url_for('home')}">Main</a>
+    <a class="btn" href="{url_for('home')}">CCLX</a>
     <a class="btn btn-primary" href="{url_for('view_log')}">Logs</a>
-  </div>
+    <a class="btn" href="{url_for('view_mqtt')}">MQTT</a>
+    </div>
 </div>
 
 <div class="card">
