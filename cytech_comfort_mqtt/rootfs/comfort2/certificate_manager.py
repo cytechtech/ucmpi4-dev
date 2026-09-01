@@ -1329,8 +1329,8 @@ def restart_mosquitto() -> None:
     Restart the Home Assistant Mosquitto broker add-on through the
     Supervisor API.
 
-    This is required after deploying a newly generated or renewed
-    Mosquitto server certificate so that Mosquitto loads the new files.
+    Used after changes to Mosquitto configuration, credentials,
+    or TLS deployment that require the broker to reload its state.
     """
 
     token = os.getenv("SUPERVISOR_TOKEN")
@@ -1342,7 +1342,7 @@ def restart_mosquitto() -> None:
         "Authorization": f"Bearer {token}"
     }
 
-    logger.info("Restarting Mosquitto broker to load new TLS certificate")
+    logger.info("Restarting Mosquitto broker")
 
     try:
         response = requests.post(
