@@ -3517,27 +3517,33 @@ def main():
     global mqttc
     MQTT_VERSION = mqtt.MQTTv5
 
-    logger.info("Checking MQTT certificate installation")
+    if settings.MQTT_TLS_ENABLED:
+        logger.info("Checking MQTT certificate installation")
 
-    try:
-        ensure_certificate_set()
+        try:
+            ensure_certificate_set()
 
-        logger.info("Checking MQTT TLS deployment")
+            logger.info("Checking MQTT TLS deployment")
 
-        mosquitto_tls_changed = deploy_mosquitto_tls_files(require_client_certificate=settings.MQTT_MUTUAL_TLS,)
-
-        if mosquitto_tls_changed:
-            logger.info(
-                "Mosquitto TLS deployment changed; "
-                "restarting Mosquitto"
+            mosquitto_tls_changed = deploy_mosquitto_tls_files(
+                require_client_certificate=settings.MQTT_MUTUAL_TLS,
             )
 
-            restart_mosquitto()
+            if mosquitto_tls_changed:
+                logger.info(
+                    "Mosquitto TLS deployment changed; "
+                    "restarting Mosquitto"
+                )
+                restart_mosquitto()
 
-    except Exception:
-        logger.exception("MQTT certificate setup failed")
-        raise
+        except Exception:
+            logger.exception("MQTT certificate setup failed")
+            raise
 
+    else:
+        logger.info(
+            "MQTT password mode selected - TLS certificate setup not required"
+        )
 
     mqttc = Comfort2(
         callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
