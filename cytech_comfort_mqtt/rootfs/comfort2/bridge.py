@@ -230,6 +230,13 @@ try:
         mosquitto_login_changed,
     )
 
+    if mosquitto_login_changed:
+        logger.info(
+            "Mosquitto login configuration changed; "
+            "restarting Mosquitto"
+        )
+        restart_mosquitto()
+
 except Exception:
     logger.exception(
         "Unable to configure Mosquitto login"
