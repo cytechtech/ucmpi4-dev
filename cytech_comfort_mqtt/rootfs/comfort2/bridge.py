@@ -3523,7 +3523,8 @@ def main():
         ensure_certificate_set()
 
         logger.info("Checking MQTT TLS deployment")
-        mosquitto_tls_changed = deploy_mosquitto_tls_files()
+
+        mosquitto_tls_changed = deploy_mosquitto_tls_files(require_client_certificate=settings.MQTT_MUTUAL_TLS,)
 
         if mosquitto_tls_changed:
             logger.info(
