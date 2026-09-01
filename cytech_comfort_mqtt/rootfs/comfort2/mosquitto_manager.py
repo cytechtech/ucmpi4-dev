@@ -160,6 +160,26 @@ def ensure_managed_login(username, password):
     )
 
     #
+    # Existing managed account:
+    # If username and password already match, no Mosquitto
+    # configuration change is required.
+    #
+    if previous_username == username:
+        for login in logins:
+            if not isinstance(login, dict):
+                continue
+
+            if login.get("username") == username:
+                if login.get("password") == password:
+                    logger.info(
+                        "Comfort-managed Mosquitto login already matches"
+                    )
+                    return False
+
+                break
+
+
+    #
     # First installation/upgrade:
     # If the requested account already exists with the correct
     # password, adopt it as the Comfort-managed account.
