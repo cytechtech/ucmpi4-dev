@@ -54,7 +54,7 @@ from cclx_parser import parse_cclx
 from options import load_options, get_str, get_int, get_bool
 from mqtt_tls import configure_client_tls
 from certificate_manager import ensure_certificate_set,deploy_mosquitto_tls_files,restart_mosquitto
-from mosquitto_manager import ensure_managed_login
+from mosquitto_manager import ensure_managed_login,get_mosquitto_options
 import comfort_protocol
 from passthrough import ComfortPassthroughServer
 
@@ -243,7 +243,16 @@ except Exception:
     )
     raise
 
+mosquitto_options = get_mosquitto_options()
 
+logger.info(
+    "Mosquitto configured usernames after update: %s",
+    [
+        login.get("username")
+        for login in mosquitto_options.get("logins", [])
+        if isinstance(login, dict)
+    ],
+)
 
 
 # Comfort
