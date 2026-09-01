@@ -46,6 +46,7 @@ class CclxParseFlags:
     sensormap: bool = False
     timermap: bool = False
     usermap: bool = False
+    responsemap: bool = False
 
 
 @dataclass
@@ -61,6 +62,7 @@ class CclxParseResult:
     sensor_properties: Dict[str, str] = field(default_factory=dict)
     timer_properties: Dict[str, str] = field(default_factory=dict)
     user_properties: Dict[str, str] = field(default_factory=dict)
+    response_properties: Dict[str, Dict[str, str]] = field(default_factory=dict)
 
 
 def parse_cclx(
@@ -96,6 +98,7 @@ def parse_cclx(
     result.sensor_properties = {}
     result.user_properties = {}
     result.timer_properties = {}
+    result.response_properties = {}
 
     if not file.is_file():
         # Mirrors your "else:" branch for file not found
@@ -288,6 +291,30 @@ def parse_cclx(
             break
 
         result.sensor_properties[number] = name
+
+    # ---- Responses ----
+    # Match only the exact "Response" tag. This intentionally excludes
+    # SensorResponse and ScsRioResponse entries from the CCLX file.
+    for response in root.iter("Response"):
+        name = response.attrib.get("Name")[:16] if response.attrib.get("Name") else ""
+        description = response.attrib.get("Description")[:200] if response.attrib.get("Description") else ""
+        number = response.attrib.get("Number")[:4] if response.attrib.get("Number") else ""
+
+        if not check_index_number(number, 1023) or not 1 <= int(number) <= 1023:
+            logger.error("Invalid Response Number detected in '%s'.", str(file))
+            result.flags.responsemap = False
+            break
+
+        if not check_zone_name(name):
+            logger.error("Invalid Response Name detected in '%s'.", str(file))
+            result.flags.responsemap = False
+            break
+
+        result.flags.responsemap = True
+        result.response_properties[number] = {
+            "Name": name,
+            "Description": description,
+        }
 
     # ---- Timers ----
     for timer in root.iter("Timer"):

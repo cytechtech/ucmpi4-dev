@@ -311,6 +311,7 @@ def _try_parse_cclx(path: Path) -> Tuple[bool, str, Dict[str, Any]]:
                 "sensors": len(result.sensor_properties),
                 "timers": len(result.timer_properties),
                 "users": len(result.user_properties),
+                "responses": len(result.response_properties),
             }
 
             return True, "Parsed OK", summary
@@ -486,7 +487,7 @@ def home():
 {passthrough_html}
 
 <div class="card">
-  <div><strong>3) CCLX Configuration</strong></div>
+  <div><strong>CCLX Configuration</strong></div>
   <div class="warn" style="margin-top:6px;">
     Use this section to upload, validate and apply a Comfort CCLX file.
   </div>

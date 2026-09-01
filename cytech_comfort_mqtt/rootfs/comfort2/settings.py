@@ -46,7 +46,7 @@ SupportedFirmware = float(7.201)  # Minimum Supported firmware.
 
 MAX_ZONES = 128                   # Configurable for future expansion
 MAX_OUTPUTS = 96                  # Configurable for future expansion
-MAX_RESPONSES = 1024              # Configurable for future expansion
+MAX_RESPONSES = 1023              # Comfort II Ultra maximum; Optimum supports 128
 COMFORT_TIMERS = 64               # Default number of timers supported by Comfort II. Max 64.
 MAX_FLAGS = 254                   # Configurable for future expansion. Max 254.
 MAX_COUNTERS = 255                # Configurable for future expansion. Max 255.
@@ -163,6 +163,7 @@ FLAGMAPFILE = False
 DEVICEMAPFILE = False
 USERMAPFILE = False
 TIMERMAPFILE = False
+RESPONSEMAPFILE = False
 
 # -------------------------------------------------------------------
 # Enrichment dictionaries (from CCLX / description files)
@@ -176,6 +177,7 @@ sensor_properties = {}
 flag_properties = {}
 user_properties = {}
 timer_properties = {}
+response_properties = {}
 
 file_exists  = False
 ACFail = False              # Indicates ACFail status.

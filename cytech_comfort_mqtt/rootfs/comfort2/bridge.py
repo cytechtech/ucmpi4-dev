@@ -770,7 +770,7 @@ class Comfort2(mqtt.Client):
         elif msg.topic.startswith(settings.DOMAIN+"/response") and msg.topic.endswith("/set"):
             response = int(msg.topic.split("/")[1][8:])
             if self.connected:
-                if (response in range(1, ALARMNUMBEROFRESPONSES + 1)) and (response in range(256, 1025)):   # Check for  valid response numbers > 255 but less than Max.
+                if (response in range(1, ALARMNUMBEROFRESPONSES + 1)) and (response in range(256, 1024)):   # Responses 256 to 1023 use the 16-bit form.
                     result = self.DecimalToSigned16(response)                                               # Returns hex value.
                     self.serial.write(("\x03R!%s\r" % result).encode())                              # Response with 16-bit converted hex number
                     settings.SAVEDTIME = datetime.now()
@@ -1445,6 +1445,11 @@ class Comfort2(mqtt.Client):
             self.publish_timer_discovery(settings.MQTT_DEVICE_COMFORT)
             self._timers_discovery_published = True
 
+        # Publish named Comfort Response buttons from the active CCLX
+        if not getattr(self, "_responses_discovery_published", False):
+            self.publish_response_discovery(settings.MQTT_DEVICE_COMFORT)
+            self._responses_discovery_published = True
+
         self.PublishBatteryVoltageDiscovery()
 
         discoverytopic = f"homeassistant/sensor/{settings.DOMAIN}/comfort_state/config"
@@ -1797,6 +1802,7 @@ class Comfort2(mqtt.Client):
         settings.sensor_properties = res.sensor_properties
         settings.timer_properties = res.timer_properties
         settings.user_properties = res.user_properties
+        settings.response_properties = res.response_properties
 
         settings.DEVICEMAPFILE  = res.flags.devicemap
         settings.ZONEMAPFILE    = res.flags.zonemap
@@ -1806,6 +1812,7 @@ class Comfort2(mqtt.Client):
         settings.SENSORMAPFILE  = res.flags.sensormap
         settings.TIMERMAPFILE   = res.flags.timermap
         settings.USERMAPFILE    = res.flags.usermap
+        settings.RESPONSEMAPFILE = res.flags.responsemap
 
         return file
 
@@ -1896,6 +1903,7 @@ class Comfort2(mqtt.Client):
         settings.flag_properties = {}
         settings.user_properties = {}
         settings.timer_properties = {}
+        settings.response_properties = {}
         # Anything else add_descriptions() populates should be reset here.
         # also clear these CCLX “flags” so publish_input_discovery uses the new file cleanly
         settings.DEVICEMAPFILE  = False
@@ -1906,6 +1914,7 @@ class Comfort2(mqtt.Client):
         settings.SENSORMAPFILE  = False
         settings.TIMERMAPFILE   = False
         settings.USERMAPFILE    = False
+        settings.RESPONSEMAPFILE = False
 
 
     # def purge_stale_output_discovery(self, start: int = 129, end: int = 255):
@@ -1993,6 +2002,7 @@ class Comfort2(mqtt.Client):
             self.clear_counter_discovery()
             self.clear_sensor_discovery()
             self.clear_timer_discovery()
+            self.clear_response_discovery()
             self.clear_battery_voltage_discovery()
 
             data_cclx = Path("/data/site.cclx")
@@ -2016,6 +2026,7 @@ class Comfort2(mqtt.Client):
                 self.publish_counter_discovery(mqtt_device_comfort)
                 self.publish_sensor_discovery(mqtt_device_comfort)
                 self.publish_timer_discovery(mqtt_device_comfort)
+                self.publish_response_discovery(mqtt_device_comfort)
                 self.PublishBatteryVoltageDiscovery()
                 self.PublishBatteryVoltageStates()
             else:
@@ -2128,6 +2139,13 @@ class Comfort2(mqtt.Client):
             self.publish(number_topic, None, qos=2, retain=True)
             self.publish(sensor_topic, None, qos=2, retain=True)
             time.sleep(0.005)
+
+    def clear_response_discovery(self):
+        """Remove retained discovery for all supported Comfort Responses."""
+        for i in range(1, int(settings.MAX_RESPONSES) + 1):
+            topic = f"homeassistant/button/{settings.DOMAIN}/response{i:04d}/config"
+            self.publish(topic, None, qos=1, retain=True)
+            time.sleep(0.002)
 
   
 
@@ -2521,6 +2539,56 @@ class Comfort2(mqtt.Client):
             })
 
             self.publish(discovery_topic, mqtt_msg, qos=2, retain=True)
+            time.sleep(0.01)
+
+    def publish_response_discovery(self, mqtt_device):
+        """Publish named normal CCLX Responses as momentary HA buttons."""
+        max_responses = int(getattr(settings, "COMFORT_RESPONSES", 0) or 0)
+        if max_responses <= 0:
+            logger.info("Response discovery disabled: alarm_responses is 0")
+            return
+
+        for key, value in settings.response_properties.items():
+            try:
+                i = int(key)
+            except (TypeError, ValueError):
+                logger.warning("publish_response_discovery: skipping non-integer key=%r", key)
+                continue
+
+            if i < 1 or i > max_responses:
+                continue
+
+            if isinstance(value, dict):
+                response_name = (value.get("Name") or value.get("name") or f"Response{i:04d}").strip()
+            elif isinstance(value, str):
+                response_name = value.strip() or f"Response{i:04d}"
+            else:
+                response_name = f"Response{i:04d}"
+
+            discovery_topic = f"homeassistant/button/{settings.DOMAIN}/response{i:04d}/config"
+            payload = {
+                "name": response_name,
+                "unique_id": f"{settings.DOMAIN}_response{i:04d}",
+                "object_id": f"{settings.DOMAIN}_response{i:04d}",
+                "command_topic": settings.ALARMRESPONSECOMMANDTOPIC % i,
+                "payload_press": "PRESS",
+                "availability": [
+                    {
+                        "topic": settings.ALARMAVAILABLETOPIC,
+                        "payload_available": "1",
+                        "payload_not_available": "0",
+                    },
+                    {
+                        "topic": settings.ALARMCONNECTEDTOPIC,
+                        "payload_available": "1",
+                        "payload_not_available": "0",
+                    },
+                ],
+                "availability_mode": "all",
+                "icon": "mdi:gesture-tap-button",
+                "device": mqtt_device,
+            }
+            self.publish(discovery_topic, json.dumps(payload), qos=1, retain=True)
             time.sleep(0.01)
 
 
@@ -3476,6 +3544,13 @@ class Comfort2(mqtt.Client):
             "items": (settings.timer_properties or {})
         })
 
+        self._publish_meta("responses", {
+            "time": ts,
+            "source": {"cclx_file": settings.COMFORT_CCLX_FILE, "enabled": bool(settings.RESPONSEMAPFILE)},
+            "count": len(settings.response_properties or {}),
+            "items": (settings.response_properties or {})
+        })
+
         # Optional: quick index/health topic
         self._publish_meta("summary", {
             "time": ts,
@@ -3488,6 +3563,7 @@ class Comfort2(mqtt.Client):
                 "sensors": bool(settings.SENSORMAPFILE),
                 "users": bool(settings.USERMAPFILE),
                 "timers": bool(settings.TIMERMAPFILE),
+                "responses": bool(settings.RESPONSEMAPFILE),
                 "devices": bool(settings.DEVICEMAPFILE),
             },
             "counts": {
@@ -3498,6 +3574,7 @@ class Comfort2(mqtt.Client):
                 "sensors": len(settings.sensor_properties or {}),
                 "users": len(settings.user_properties or {}),
                 "timers": len(settings.timer_properties or {}),
+                "responses": len(settings.response_properties or {}),
             }
         })
 
