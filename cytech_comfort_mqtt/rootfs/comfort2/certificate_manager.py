@@ -51,6 +51,7 @@ MOSQUITTO_SERVER_CERT = MOSQUITTO_TLS_DIR / "mqtt-server.crt"
 MOSQUITTO_SERVER_KEY = MOSQUITTO_TLS_DIR / "mqtt-server.key"
 MOSQUITTO_TLS_CONFIG = MOSQUITTO_TLS_DIR / "tls.conf"
 MOSQUITTO_CA_CERT = MOSQUITTO_TLS_DIR / "ca.crt"
+MOSQUITTO_RESTART_REQUIRED = Path("/data/mosquitto_restart_required")
 
 def ensure_certificate_directories() -> None:
     """Create the certificate directories if they do not already exist."""
@@ -1324,6 +1325,54 @@ def ensure_certificate_set() -> bool:
     )
 
 
+def mark_mosquitto_restart_required() -> None:
+    """
+    Record that Mosquitto must be restarted.
+
+    The marker is stored in persistent add-on data so that a failed
+    restart can be retried on the next Comfort add-on startup.
+    """
+
+    MOSQUITTO_RESTART_REQUIRED.write_text(
+        "restart required\n",
+        encoding="utf-8",
+    )
+
+    logger.info(
+        "Mosquitto restart marked as required"
+    )
+
+
+def restart_mosquitto_if_required() -> bool:
+    """
+    Restart Mosquitto if a persistent restart-required marker exists.
+
+    The marker is removed only after Supervisor has successfully
+    accepted the restart request.
+
+    Returns:
+        True if a Mosquitto restart was requested.
+        False if no restart was required.
+    """
+
+    if not MOSQUITTO_RESTART_REQUIRED.is_file():
+        return False
+
+    logger.info(
+        "Pending Mosquitto restart detected"
+    )
+
+    restart_mosquitto()
+
+    MOSQUITTO_RESTART_REQUIRED.unlink(missing_ok=True)
+
+    logger.info(
+        "Mosquitto restart requirement cleared"
+    )
+
+    return True
+
+
 def restart_mosquitto() -> None:
     """
     Restart the Home Assistant Mosquitto broker add-on through the
@@ -1359,7 +1408,6 @@ def restart_mosquitto() -> None:
         ) from exc
 
     logger.info("Mosquitto broker restart requested successfully")
-
 
 
 def get_home_assistant_ipv4() -> ipaddress.IPv4Address:

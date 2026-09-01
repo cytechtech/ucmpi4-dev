@@ -53,7 +53,12 @@ import settings
 from cclx_parser import parse_cclx
 from options import load_options, get_str, get_int, get_bool
 from mqtt_tls import configure_client_tls
-from certificate_manager import ensure_certificate_set,deploy_mosquitto_tls_files,restart_mosquitto
+from certificate_manager import (
+    ensure_certificate_set,
+    deploy_mosquitto_tls_files,
+    mark_mosquitto_restart_required,
+    restart_mosquitto_if_required
+)
 from mosquitto_manager import ensure_managed_login
 import comfort_protocol
 from passthrough import ComfortPassthroughServer
@@ -3519,11 +3524,9 @@ def main():
             )
 
             if mosquitto_tls_changed:
-                logger.info(
-                    "Mosquitto TLS deployment changed; "
-                    "restarting Mosquitto"
-                )
-                restart_mosquitto()
+                mark_mosquitto_restart_required()
+
+            restart_mosquitto_if_required()
 
         except Exception:
             logger.exception("MQTT certificate setup failed")
@@ -3533,6 +3536,7 @@ def main():
         logger.info(
             "MQTT password mode selected - TLS certificate setup not required"
         )
+
 
     mqttc = Comfort2(
         callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
