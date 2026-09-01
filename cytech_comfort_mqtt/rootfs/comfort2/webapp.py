@@ -73,16 +73,11 @@ logger.debug("Web UI RAM logging initialised at %s", log_verbosity)
 import cclx_parser
 import settings
 
-MQTT_HOST = settings.MQTTBROKER
-MQTT_PORT = settings.MQTTPORT
-MQTT_USER = settings.MQTTUSERNAME
-MQTT_PASS = settings.MQTTPASSWORD
 
 logger.debug(
     "WebUI MQTT config | host=%s port=%s user=%r pass_set=%s",
-    MQTT_HOST, MQTT_PORT, MQTT_USER, bool(MQTT_PASS)
+    settings.MQTTBROKER, settings.MQTTPORT, settings.MQTTUSERNAME, bool(settings.MQTTPASSWORD)
 )
-
 
 
 # ---- Paths (use /data for production persistence) ----
@@ -129,8 +124,8 @@ def _set_passthrough_mode(active: bool) -> None:
 
     c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
 
-    if MQTT_USER:
-        c.username_pw_set(MQTT_USER, MQTT_PASS or "")
+    if settings.MQTTUSERNAME:
+        c.username_pw_set(settings.MQTTUSERNAME, settings.MQTTPASSWORD or "")
 
     configure_client_tls(
         c,
@@ -141,7 +136,7 @@ def _set_passthrough_mode(active: bool) -> None:
         client_key_filename=settings.MQTT_CLIENT_KEY,
     )
 
-    c.connect(MQTT_HOST, MQTT_PORT, 10)
+    c.connect(settings.MQTTBROKER, settings.MQTTPORT, 10)
 
     c.publish(
         PASSTHROUGH_TOPIC,
@@ -157,7 +152,7 @@ def mqtt_publish_reload(reason: str | None = None) -> None:
     logger.warning("MQTT reload publish requested | topic=%s | reason=%s", RELOAD_TOPIC, reason)
     logger.warning(
         "MQTT connection params | host=%s | port=%s | user=%s | password_set=%s | domain=%s",
-        MQTT_HOST, MQTT_PORT, MQTT_USER, bool(MQTT_PASS), DOMAIN
+        settings.MQTTBROKER, settings.MQTTPORT, settings.MQTTUSERNAME, bool(settings.MQTTPASSWORD), DOMAIN
     )
 
     connected = threading.Event()
@@ -179,8 +174,8 @@ def mqtt_publish_reload(reason: str | None = None) -> None:
     c.on_connect = _on_connect
     c.on_disconnect = _on_disconnect
 
-    if MQTT_USER:
-        c.username_pw_set(MQTT_USER, MQTT_PASS or "")
+    if settings.MQTTUSERNAME:
+        c.username_pw_set(settings.MQTTUSERNAME, settings.MQTTPASSWORD or "")
         logger.debug("MQTT auth configured (username provided)")
     else:
         logger.debug("MQTT auth not configured")
@@ -198,7 +193,7 @@ def mqtt_publish_reload(reason: str | None = None) -> None:
     c.loop_start()
     try:
         logger.debug("Connecting to MQTT broker...")
-        c.connect_async(MQTT_HOST, MQTT_PORT, keepalive=10)
+        c.connect_async(settings.MQTTBROKER, settings.MQTTPORT, keepalive=10)
 
         if not connected.wait(timeout=10.0):
             raise RuntimeError("MQTT connect did not complete (timeout waiting for on_connect)")
