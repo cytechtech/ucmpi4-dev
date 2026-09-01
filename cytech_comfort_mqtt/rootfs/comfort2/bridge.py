@@ -54,7 +54,7 @@ from cclx_parser import parse_cclx
 from options import load_options, get_str, get_int, get_bool
 from mqtt_tls import configure_client_tls
 from certificate_manager import ensure_certificate_set,deploy_mosquitto_tls_files,restart_mosquitto
-from mosquitto_manager import check_managed_login
+from mosquitto_manager import ensure_managed_login
 import comfort_protocol
 from passthrough import ComfortPassthroughServer
 
@@ -220,20 +220,21 @@ settings.MQTTBROKERIP = get_ip_address(
 
 
 try:
-    mosquitto_login_changed = check_managed_login(
+    mosquitto_login_changed = ensure_managed_login(
         settings.MQTTUSERNAME,
         settings.MQTTPASSWORD,
     )
 
     logger.info(
-        "Mosquitto login configuration change required: %s",
+        "Mosquitto login configuration changed: %s",
         mosquitto_login_changed,
     )
 
 except Exception:
     logger.exception(
-        "Unable to check Mosquitto login configuration"
+        "Unable to configure Mosquitto login"
     )
+    raise
 
 
 
