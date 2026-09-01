@@ -54,6 +54,7 @@ from cclx_parser import parse_cclx
 from options import load_options, get_str, get_int, get_bool
 from mqtt_tls import configure_client_tls
 from certificate_manager import ensure_certificate_set,deploy_mosquitto_tls_files,restart_mosquitto
+from mosquitto_manager import get_mosquitto_options
 import comfort_protocol
 from passthrough import ComfortPassthroughServer
 
@@ -215,6 +216,30 @@ settings.MQTTPORT = (
 settings.MQTTBROKERIP = get_ip_address(
     settings.MQTTBROKER
 )
+
+
+
+try:
+    mosquitto_options = get_mosquitto_options()
+
+    logger.info(
+        "Mosquitto options read successfully; keys: %s",
+        list(mosquitto_options.keys()),
+    )
+
+    logins = mosquitto_options.get("logins", [])
+
+    logger.info(
+        "Mosquitto configured usernames: %s",
+        [
+            login.get("username")
+            for login in logins
+            if isinstance(login, dict)
+        ],
+    )
+
+except Exception:
+    logger.exception("Unable to read Mosquitto options")
 
 
 
