@@ -73,6 +73,51 @@ logger.debug("Web UI RAM logging initialised at %s", log_verbosity)
 import cclx_parser
 import settings
 
+# webapp.py runs in a separate process from bridge.py, so it must load its
+# own MQTT runtime settings from the add-on options. Changes that bridge.py
+# makes to the settings module are not shared with this process.
+settings.MQTTUSERNAME = get_str(
+    _opts,
+    "mqtt_user",
+    settings.MQTTUSERNAME,
+)
+
+settings.MQTTPASSWORD = get_str(
+    _opts,
+    "mqtt_password",
+    settings.MQTTPASSWORD,
+)
+
+settings.MQTT_SECURITY = get_str(
+    _opts,
+    "mqtt_security",
+    "password",
+).strip().lower()
+
+if settings.MQTT_SECURITY not in {
+    "password",
+    "tls",
+    "mutual_tls",
+}:
+    raise RuntimeError(
+        f"Invalid MQTT security mode: {settings.MQTT_SECURITY}"
+    )
+
+settings.MQTT_TLS_ENABLED = settings.MQTT_SECURITY in {
+    "tls",
+    "mutual_tls",
+}
+
+settings.MQTT_MUTUAL_TLS = (
+    settings.MQTT_SECURITY == "mutual_tls"
+)
+
+settings.MQTTPORT = (
+    8883
+    if settings.MQTT_TLS_ENABLED
+    else 1883
+)
+
 
 # ---- Paths (use /data for production persistence) ----
 DATA_DIR = Path("/data")
@@ -159,8 +204,9 @@ def mqtt_publish_reload(reason: str | None = None) -> None:
         rc_val = getattr(reason_code, "value", reason_code)
         logger.debug("MQTT on_connect reason_code=%s (value=%s)", reason_code, rc_val)
         conn_rc["rc"] = rc_val
-        if rc_val == 0:
-            connected.set()
+        # Wake the waiting request for both success and refusal. Otherwise a
+        # broker rejection causes repeated reconnects until the 10 s timeout.
+        connected.set()
 
     def _on_disconnect(client, userdata, disconnect_flags, reason_code, properties):
         rc_val = getattr(reason_code, "value", reason_code)
