@@ -1350,9 +1350,12 @@ def restart_mosquitto_if_required() -> bool:
     The marker is removed only after Supervisor has successfully
     accepted the restart request.
 
+    If the restart fails, the marker is deliberately left in place
+    so that the restart will be retried on the next add-on startup.
+
     Returns:
-        True if a Mosquitto restart was requested.
-        False if no restart was required.
+        True if Mosquitto was restarted successfully.
+        False if no restart was required or the restart failed.
     """
 
     if not MOSQUITTO_RESTART_REQUIRED.is_file():
@@ -1362,7 +1365,15 @@ def restart_mosquitto_if_required() -> bool:
         "Pending Mosquitto restart detected"
     )
 
-    restart_mosquitto()
+    try:
+        restart_mosquitto()
+
+    except Exception:
+        logger.exception(
+            "Mosquitto restart failed; "
+            "restart requirement retained for next startup"
+        )
+        return False
 
     MOSQUITTO_RESTART_REQUIRED.unlink(missing_ok=True)
 
@@ -1372,7 +1383,6 @@ def restart_mosquitto_if_required() -> bool:
 
     return True
 
-
 def restart_mosquitto() -> None:
     """
     Restart the Home Assistant Mosquitto broker add-on through the
@@ -1381,7 +1391,12 @@ def restart_mosquitto() -> None:
     Used after changes to Mosquitto configuration, credentials,
     or TLS deployment that require the broker to reload its state.
     """
-    raise RuntimeError("TEST: simulated Mosquitto restart failure")
+    raise RuntimeError(
+        "TEST: simulated Mosquitto restart failure"
+    )
+
+
+
     token = os.getenv("SUPERVISOR_TOKEN")
 
     if not token:
