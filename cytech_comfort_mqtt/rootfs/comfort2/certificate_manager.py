@@ -50,6 +50,7 @@ MOSQUITTO_TLS_DIR = Path("/share/mosquitto")
 MOSQUITTO_SERVER_CERT = MOSQUITTO_TLS_DIR / "mqtt-server.crt"
 MOSQUITTO_SERVER_KEY = MOSQUITTO_TLS_DIR / "mqtt-server.key"
 MOSQUITTO_TLS_CONFIG = MOSQUITTO_TLS_DIR / "tls.conf"
+MOSQUITTO_CA_CERT = MOSQUITTO_TLS_DIR / "ca.crt"
 
 def ensure_certificate_directories() -> None:
     """Create the certificate directories if they do not already exist."""
@@ -94,22 +95,31 @@ def certificate_status() -> dict[str, bool]:
     }
 
 
-def deploy_mosquitto_tls_files() -> bool:
+def deploy_mosquitto_tls_files(
+    require_client_certificate: bool = False,
+) -> bool:
     """
-    Deploy the validated MQTT server certificate/key and TLS configuration
-    to the Home Assistant Mosquitto custom configuration directory.
+    Deploy the validated MQTT TLS files and Mosquitto custom
+    configuration.
 
-    The authoritative certificate/key remain in /ssl/cytech_comfort.
-    The files in /share/mosquitto are deployment copies used by Mosquitto.
+    When require_client_certificate is False:
+        TLS encrypts the MQTT connection and Mosquitto authenticates
+        the client using username/password.
+
+    When require_client_certificate is True:
+        Mosquitto additionally requires a client certificate signed
+        by this installation's local CA.
 
     Returns:
         True if any Mosquitto TLS deployment file was created or changed.
 
         False if the deployed files already exactly match the required
-        certificate, key, and configuration.
+        certificate, key, CA certificate, and configuration.
     """
 
-    # Never deploy an invalid or mismatched server certificate/key pair.
+    # Never deploy invalid certificate material.
+    validate_certificate(CA_CERT)
+
     validate_certificate(SERVER_CERT)
     validate_key_matches_cert(SERVER_CERT, SERVER_KEY)
     validate_signed_by_ca(SERVER_CERT)
@@ -119,18 +129,31 @@ def deploy_mosquitto_tls_files() -> bool:
         exist_ok=True,
     )
 
-    required_config = (
-        "listener 8883\n"
-        "protocol mqtt\n"
-        "\n"
-        "certfile /share/mosquitto/mqtt-server.crt\n"
-        "keyfile /share/mosquitto/mqtt-server.key\n"
-        "\n"
-        "require_certificate false\n"
-    )
+    if require_client_certificate:
+        required_config = (
+            "listener 8883\n"
+            "protocol mqtt\n"
+            "\n"
+            "certfile /share/mosquitto/mqtt-server.crt\n"
+            "keyfile /share/mosquitto/mqtt-server.key\n"
+            "cafile /share/mosquitto/ca.crt\n"
+            "\n"
+            "require_certificate true\n"
+        )
+    else:
+        required_config = (
+            "listener 8883\n"
+            "protocol mqtt\n"
+            "\n"
+            "certfile /share/mosquitto/mqtt-server.crt\n"
+            "keyfile /share/mosquitto/mqtt-server.key\n"
+            "\n"
+            "require_certificate false\n"
+        )
 
     source_cert = SERVER_CERT.read_bytes()
     source_key = SERVER_KEY.read_bytes()
+    source_ca = CA_CERT.read_bytes()
 
     deployment_changed = False
 
@@ -168,6 +191,21 @@ def deploy_mosquitto_tls_files() -> bool:
     MOSQUITTO_SERVER_KEY.chmod(0o600)
 
     # ------------------------------------------------------------
+    # Certificate Authority
+    # ------------------------------------------------------------
+
+    if (
+        not MOSQUITTO_CA_CERT.is_file()
+        or MOSQUITTO_CA_CERT.read_bytes() != source_ca
+    ):
+        MOSQUITTO_CA_CERT.write_bytes(source_ca)
+        deployment_changed = True
+
+        logger.info(
+            "Mosquitto TLS CA certificate deployed"
+        )
+
+    # ------------------------------------------------------------
     # Mosquitto TLS configuration
     # ------------------------------------------------------------
 
@@ -183,7 +221,9 @@ def deploy_mosquitto_tls_files() -> bool:
         deployment_changed = True
 
         logger.info(
-            "Mosquitto TLS configuration deployed"
+            "Mosquitto TLS configuration deployed "
+            "(client certificate required: %s)",
+            require_client_certificate,
         )
 
     if deployment_changed:

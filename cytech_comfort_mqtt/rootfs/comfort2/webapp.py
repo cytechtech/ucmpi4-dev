@@ -74,12 +74,6 @@ import cclx_parser
 import settings
 
 
-logger.debug(
-    "WebUI MQTT config | host=%s port=%s user=%r pass_set=%s",
-    settings.MQTTBROKER, settings.MQTTPORT, settings.MQTTUSERNAME, bool(settings.MQTTPASSWORD)
-)
-
-
 # ---- Paths (use /data for production persistence) ----
 DATA_DIR = Path("/data")
 ACTIVE_CCLX = DATA_DIR / "site.cclx"
