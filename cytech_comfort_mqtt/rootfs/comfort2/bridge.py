@@ -238,6 +238,9 @@ try:
     if mosquitto_login_changed:
         mark_mosquitto_restart_required()
 
+    # TEMPORARY TEST
+    mark_mosquitto_restart_required()
+
     restart_mosquitto_if_required()
 
 except Exception:
