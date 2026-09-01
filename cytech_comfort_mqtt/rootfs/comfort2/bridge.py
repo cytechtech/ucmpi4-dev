@@ -3525,7 +3525,7 @@ def main():
 
             if mosquitto_tls_changed:
                 mark_mosquitto_restart_required()
-
+            mark_mosquitto_restart_required()
             restart_mosquitto_if_required()
 
         except Exception:
