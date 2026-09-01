@@ -3511,32 +3511,56 @@ def main():
     global mqttc
     MQTT_VERSION = mqtt.MQTTv5
 
-    if settings.MQTT_TLS_ENABLED:
-        logger.info("Checking MQTT certificate installation")
+    # if settings.MQTT_TLS_ENABLED:
+    #     logger.info("Checking MQTT certificate installation")
 
-        try:
-            ensure_certificate_set()
+    #     try:
+    #         ensure_certificate_set()
 
-            logger.info("Checking MQTT TLS deployment")
+    #         logger.info("Checking MQTT TLS deployment")
 
-            mosquitto_tls_changed = deploy_mosquitto_tls_files(
-                require_client_certificate=settings.MQTT_MUTUAL_TLS,
-            )
+    #         mosquitto_tls_changed = deploy_mosquitto_tls_files(
+    #             require_client_certificate=settings.MQTT_MUTUAL_TLS,
+    #         )
 
-            if mosquitto_tls_changed:
-                mark_mosquitto_restart_required()
-            mark_mosquitto_restart_required()
-            restart_mosquitto_if_required()
+    #         if mosquitto_tls_changed:
+    #             mark_mosquitto_restart_required()
+    #         mark_mosquitto_restart_required()
+    #         restart_mosquitto_if_required()
 
-        except Exception:
-            logger.exception("MQTT certificate setup failed")
-            raise
+    #     except Exception:
+    #         logger.exception("MQTT certificate setup failed")
+    #         raise
 
-    else:
-        logger.info(
-            "MQTT password mode selected - TLS certificate setup not required"
+    # else:
+    #     logger.info(
+    #         "MQTT password mode selected - TLS certificate setup not required"
+    #     )
+
+    try:
+        mosquitto_login_changed = ensure_managed_login(
+            settings.MQTTUSERNAME,
+            settings.MQTTPASSWORD,
         )
 
+        logger.info(
+            "Mosquitto login configuration changed: %s",
+            mosquitto_login_changed,
+        )
+
+        if mosquitto_login_changed:
+            mark_mosquitto_restart_required()
+
+        # TEMPORARY TEST
+        mark_mosquitto_restart_required()
+
+        restart_mosquitto_if_required()
+
+    except Exception:
+        logger.exception(
+            "Unable to configure Mosquitto login"
+        )
+        raise
 
     mqttc = Comfort2(
         callback_api_version=mqtt.CallbackAPIVersion.VERSION2,
