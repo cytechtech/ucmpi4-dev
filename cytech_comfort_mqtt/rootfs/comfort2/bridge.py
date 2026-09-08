@@ -3059,17 +3059,6 @@ class Comfort2(mqtt.Client):
             ipMsg = comfort_protocol.ComfortIPInputActivationReport(line[1:])
 
             if ipMsg.state < 2:
-
-                try:
-                    _name = settings.input_properties[str(ipMsg.input)]['Name'] if settings.ZONEMAPFILE else f"Zone{ipMsg.input:02d}"
-                except KeyError:
-                    _name = f"Zone{ipMsg.input}"
-
-                try:
-                    _zoneword = settings.input_properties[str(ipMsg.input)]['ZoneWord'] if settings.ZONEMAPFILE else ""
-                except KeyError:
-                    _zoneword = ""
-
                 settings.ZoneCache[ipMsg.input] = ipMsg.state
 
                 if 1 <= ipMsg.input <= int(settings.COMFORT_INPUTS):
@@ -3080,17 +3069,6 @@ class Comfort2(mqtt.Client):
                         retain=True
                     )
                     time.sleep(0.01)
-
-                log_msg = json.dumps({
-                    "Time": datetime.now().replace(microsecond=0).isoformat(),
-                    "Type": "input",
-                    "Id": ipMsg.input,
-                    "Name": _name,
-                    "ZoneWord": _zoneword,
-                    "State": int(ipMsg.state),
-                    "Bypass": settings.BypassCache[ipMsg.input]
-                })
-                self.publish(settings.ALARMLOGTOPIC, log_msg, qos=2, retain=False)
 
         # --- COUNTERS ---
         elif line[1:3] == "CT":
@@ -3138,19 +3116,10 @@ class Comfort2(mqtt.Client):
             ipMsgTR = comfort_protocol.ComfortTRReport(line[1:])
             timer_id = ipMsgTR.timer
             value = ipMsgTR.value
-            state = ipMsgTR.state
             topic = settings.COMFORTTIMERSTOPIC % timer_id
 
             self.publish(topic, str(value), qos=2, retain=True)
 
-            log_msg = json.dumps({
-                "Time": datetime.now().replace(microsecond=0).isoformat(),
-                "Type": "timer",
-                "Id": timer_id,
-                "Value": value,
-                "State": state
-            })
-            self.publish(settings.ALARMLOGTOPIC, log_msg, qos=2, retain=False)
             time.sleep(0.01)
 
         # --- LOGIN REPORT ---
