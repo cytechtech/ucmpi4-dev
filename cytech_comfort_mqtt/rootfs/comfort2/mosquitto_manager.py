@@ -119,6 +119,42 @@ def _write_mosquitto_options(options):
         )
 
 
+
+def ensure_custom_configuration():
+    """
+    Ensure Mosquitto loads configuration files from /share/mosquitto.
+
+    Existing Mosquitto options and other customize values are preserved.
+    Returns True when the Mosquitto options were changed.
+    """
+    options = get_mosquitto_options()
+
+    customize = options.get("customize", {})
+    if not isinstance(customize, dict):
+        customize = {}
+
+    if (
+        customize.get("active") is True
+        and customize.get("folder") == "mosquitto"
+    ):
+        logger.info("Mosquitto custom configuration is already enabled")
+        return False
+
+    customize = dict(customize)
+    customize["active"] = True
+    customize["folder"] = "mosquitto"
+    options["customize"] = customize
+
+    _write_mosquitto_options(options)
+
+    logger.info(
+        "Mosquitto custom configuration enabled "
+        "for /share/mosquitto"
+    )
+    return True
+
+
+
 def ensure_managed_login(username, password):
     """
     Ensure that Mosquitto contains the username/password requested

@@ -59,7 +59,7 @@ from certificate_manager import (
     mark_mosquitto_restart_required,
     restart_mosquitto_if_required
 )
-from mosquitto_manager import ensure_managed_login
+from mosquitto_manager import ensure_managed_login, ensure_custom_configuration
 import comfort_protocol
 from passthrough import ComfortPassthroughServer
 
@@ -223,7 +223,6 @@ settings.MQTTBROKERIP = get_ip_address(
 )
 
 
-
 try:
     mosquitto_login_changed = ensure_managed_login(
         settings.MQTTUSERNAME,
@@ -235,14 +234,26 @@ try:
         mosquitto_login_changed,
     )
 
-    if mosquitto_login_changed:
+    mosquitto_custom_changed = False
+
+    if settings.MQTT_TLS_ENABLED:
+        mosquitto_custom_changed = ensure_custom_configuration()
+
+        logger.info(
+            "Mosquitto custom configuration changed: %s",
+            mosquitto_custom_changed,
+        )
+
+    if mosquitto_login_changed or mosquitto_custom_changed:
         mark_mosquitto_restart_required()
 
-    restart_mosquitto_if_required()
+    # TLS startup deploys tls.conf before processing the pending restart.
+    if not settings.MQTT_TLS_ENABLED:
+        restart_mosquitto_if_required()
 
 except Exception:
     logger.exception(
-        "Unable to configure Mosquitto login"
+        "Unable to configure Mosquitto login or custom configuration"
     )
     raise
 
