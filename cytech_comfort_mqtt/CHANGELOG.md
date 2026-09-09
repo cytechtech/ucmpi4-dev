@@ -1,3 +1,21 @@
+## [1.0.9] - 2026-09-09
+
+### Changed
+- Added configurable MQTT security levels
+- Responses now available through CCLX discovery
+- Fixed issue with Alarm Log being reset when open zones are present
+- Fixed # key being ignored when incomplete data received.
+
+## [1.0.8] - 2026-07-02
+
+### Changed
+- Modified MQTT message clear code
+
+## [1.0.7] - 2026-06-20
+
+### Changed
+- Test version
+
 ## [1.0.6] - 2026-05-28
 
 ### Changed

@@ -6,6 +6,13 @@ configuration:
       Select the serial baud rate for the Comfort connection.
       Use 115200 for UCMA/Pi or CM4Pi on CM9001.
       Use 9600 for CM4Pi on UCMA/General.
+  mqtt_security:
+    name: MQTT security
+    description: >-
+      Choose how the add-on connects to MQTT. Password uses a username and
+      password without encryption. TLS adds encryption. Mutual TLS adds
+      encryption and also identifies the add-on with a certificate.
+      Certificates are created automatically.    
   comfort_login_id:
     name: Comfort User Login ID
     description: >-

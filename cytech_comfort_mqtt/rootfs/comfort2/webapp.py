@@ -850,14 +850,13 @@ def view_mqtt():
 
   <p>
     When TLS is enabled, the Mosquitto broker uses a certificate
-    issued by a certificate authority unique to this Home Assistant
-    installation.
+    created specifically for this Home Assistant installation.
   </p>
 
   <p>
-    Other MQTT applications connecting securely to this broker on
-    port 8883 may need this CA certificate so that they can verify
-    the Mosquitto broker certificate.
+    Other MQTT applications connecting securely on port 8883 may need
+    this CA certificate to verify that they are connecting to the
+    correct Mosquitto broker.
   </p>
 
   <div class="row" style="margin-top:12px;">
