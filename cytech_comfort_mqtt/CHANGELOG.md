@@ -1,3 +1,8 @@
+## [1.0.10] - 2026-09-09
+
+### Changed
+- Recovery for tls certificates left over from previous installations
+
 ## [1.0.9] - 2026-09-09
 
 ### Changed

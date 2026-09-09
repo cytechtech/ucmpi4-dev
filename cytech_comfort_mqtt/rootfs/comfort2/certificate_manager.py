@@ -96,6 +96,37 @@ def certificate_status() -> dict[str, bool]:
     }
 
 
+def remove_orphaned_shared_certificate_set() -> None:
+    """Remove certificates whose private CA key is no longer available.
+
+    The private CA key belongs to this add-on installation and is stored in
+    /data. Files under /ssl can survive an uninstall or can have been created
+    by an installation of this add-on from another repository. Without the
+    matching CA key, that shared certificate set cannot be renewed safely.
+    """
+
+    logger.warning(
+        "MQTT certificates exist in shared storage but this installation's "
+        "private CA key is missing; replacing the orphaned certificate set. "
+        "External MQTT clients must download the new CA certificate"
+    )
+
+    managed_paths = (
+        CA_CERT,
+        SERVER_KEY,
+        SERVER_CERT,
+        CLIENT_KEY,
+        CLIENT_CERT,
+        SSL_CERT_DIR / "mqtt-server.crt.new",
+        SSL_CERT_DIR / "mqtt-server.key.new",
+        SSL_CERT_DIR / "mqtt-server.crt.bak",
+        SSL_CERT_DIR / "mqtt-server.key.bak",
+    )
+
+    for path in managed_paths:
+        path.unlink(missing_ok=True)
+
+
 def deploy_mosquitto_tls_files(
     require_client_certificate: bool = False,
 ) -> bool:
@@ -1163,6 +1194,9 @@ def ensure_certificate_set() -> bool:
           Generate a new installation-specific CA, server certificate,
           and client certificate.
 
+      - Shared certificates exist but this installation's CA key is absent:
+          Remove the orphaned shared files and generate a new complete set.
+
       - Valid CA exists but server/client certificates are missing:
           Recover safely by generating the missing certificate pairs
           using the existing CA.
@@ -1172,6 +1206,19 @@ def ensure_certificate_set() -> bool:
     """
 
     ensure_certificate_directories()
+
+    status = certificate_status()
+
+    # Shared /ssl files survive uninstall and are also visible to copies of
+    # this add-on installed from other repositories. If this installation has
+    # no matching private CA key in /data, the shared set is orphaned and can
+    # neither be renewed nor used for issuing replacement client certificates.
+    if not status["ca_key"] and any(
+        exists
+        for name, exists in status.items()
+        if name != "ca_key"
+    ):
+        remove_orphaned_shared_certificate_set()
 
     # Recover any server certificate renewal that was interrupted by
     # an add-on restart, host restart, or power failure.
