@@ -376,6 +376,9 @@ class LoggedSerial(serial.Serial):
         except Exception:
             text = repr(data)
 
+        # Never expose login or arm/disarm codes in either log destination.
+        text = re.sub(r"(\x03(?:LI|[mM]![0-9A-Fa-f]{2}))[^\r\x03]+",
+                      r"\1[redacted]", text)
         logger.debug("TX: %r", text)
         return super().write(data)
 
@@ -486,6 +489,8 @@ class Comfort2(mqtt.Client):
         self.mqtt_port = mqtt_port
         self.comfort_pincode = comfort_pincode
         self.connected = False
+        self._login_pending = False
+        self._login_error = None
         if mqtt_username:
             self.username_pw_set(mqtt_username, mqtt_password)
         else:
@@ -617,6 +622,9 @@ class Comfort2(mqtt.Client):
                 qos=1,
                 retain=True
             )
+            # A rejection can arrive before MQTT/log initialization completes.
+            if getattr(self, "_login_error", None):
+                self.publish_alarm_message(self._login_error)
             # self.alarm_log.add("Addon Started, MQTT Broker Connected.", level="INFO")
             # logger.warning("BOOT: calling initial reload")
             # self._handle_reload_request(source="startup", reason="boot")
@@ -639,6 +647,9 @@ class Comfort2(mqtt.Client):
     # The callback for when a PUBLISH message is received from the server.
     # Converted to use serial comms - send commands to Comfort via uart.
     def on_message(self, client, userdata, msg):    #=0
+        if msg.topic == settings.ALARMCOMMANDTOPIC and getattr(msg, "retain", False):
+            logger.warning("Ignoring retained alarm command replay on %s", msg.topic)
+            return
         payload_raw = (msg.payload or b"").decode("utf-8", errors="replace").strip()
 
         # Default behaviour for non-alarm topics:
@@ -647,14 +658,11 @@ class Comfort2(mqtt.Client):
 
         # Only parse "COMMAND [PIN]" on the alarm command topic
         if msg.topic == settings.ALARMCOMMANDTOPIC:
-            logger.debug("cmd is %s", payload_raw)
             parts = payload_raw.split(maxsplit=1)
             msgstr = (parts[0] if parts else "").strip().upper()
             pin_entered = (parts[1] if len(parts) > 1 else "").strip()
 
-            # Only log PIN when it's actually a DISARM command
-            if msgstr == "DISARM" and pin_entered:
-                logger.debug("PIN entered in command: %s", pin_entered)
+            logger.debug("Alarm command: %s", msgstr)
 
         if msg.topic == settings.ALARMLOGCLEARTOPIC:
             logger.debug("In ALARMLOGCLEARTOPIC topic is %s",msg.topic )
@@ -1118,10 +1126,12 @@ class Comfort2(mqtt.Client):
         masked = "*" * len(self.comfort_pincode)
         logger.info("Sending Comfort login LI%s", masked)
 
+        self.connected = False
+        self._login_pending = True
+        settings.COMFORTCONNECTED = False
         self.serial.write(("\x03LI"+self.comfort_pincode+"\r").encode())
-        settings.COMFORTCONNECTED = True
-        if settings.BROKERCONNECTED:         # Check to see if Broker is connected. Is not always at this point in the startup.
-            self.publish(settings.ALARMCONNECTEDTOPIC, 1, qos=2, retain=True)
+        if settings.BROKERCONNECTED:
+            self.publish(settings.ALARMCONNECTEDTOPIC, 0, qos=2, retain=True)
         settings.SAVEDTIME = datetime.now()
 
 
@@ -1958,7 +1968,12 @@ class Comfort2(mqtt.Client):
 
     def startup_reload_when_ready(self):
         if not settings.MQTT_DEVICE_COMFORT:
-            logger.warning("Startup reload delayed: MQTT_DEVICE_COMFORT not ready")
+            now = time.monotonic()
+            previous = getattr(self, "_startup_wait_logged_at", None)
+            if previous is None or now - previous >= 30:
+                reason = getattr(self, "_login_error", None) or "waiting for Comfort device information"
+                logger.warning("Startup reload delayed: %s", reason)
+                self._startup_wait_logged_at = now
             threading.Timer(1, self.startup_reload_when_ready).start()
             return
 
@@ -3022,7 +3037,10 @@ class Comfort2(mqtt.Client):
         if line[1:3] == "LU":
             luMsg = comfort_protocol.ComfortLUUserLoggedIn(line[1:])
             if luMsg.user != 0:
-                logger.debug('Comfort Login Ok - User %s', (luMsg.user if luMsg.user != 254 else 'Engineer'))
+                login_error = getattr(self, "_login_error", None)
+                self._login_pending = False
+                self._login_error = None
+                logger.info('Comfort login successful - User %s', (luMsg.user if luMsg.user != 254 else 'Engineer'))
 
                 if settings.BROKERCONNECTED:
                     time.sleep(1)
@@ -3032,7 +3050,9 @@ class Comfort2(mqtt.Client):
                 self.connected = True
                 settings.COMFORTCONNECTED = True
 
-                self.publish(settings.ALARMCOMMANDTOPIC, "comm test", qos=2, retain=True)
+                self.publish(settings.ALARMCONNECTEDTOPIC, 1, qos=2, retain=True)
+                if login_error:
+                    self.publish_alarm_message("Comfort login successful")
                 time.sleep(0.01)
 
                 self.publish(settings.REFRESHTOPIC, None, qos=2, retain=True)
@@ -3046,14 +3066,27 @@ class Comfort2(mqtt.Client):
                     settings.FIRST_LOGIN = False
 
             else:
-                logger.debug("Disconnect (LU00)")
+                rejected = getattr(self, "_login_pending", False)
+                self._login_pending = False
+                self.connected = False
                 settings.FIRST_LOGIN = True
                 settings.COMFORTCONNECTED = False
+                self.alarm_status.heartbeat(False)
+                if rejected:
+                    self._login_error = (
+                        "Comfort login rejected - check Comfort user code "
+                        "(comfort_login_id) in add-on configuration"
+                    )
+                    logger.error(self._login_error)
+                    self.publish_alarm_message(self._login_error)
+                elif not getattr(self, "_login_error", None):
+                    logger.warning("Comfort session logged out (LU00)")
+                    self.publish_alarm_message("Comfort session logged out (LU00)")
 
                 if settings.BROKERCONNECTED:
                     self.publish(settings.ALARMAVAILABLETOPIC, 0, qos=2, retain=True)
                     self.publish(settings.ALARMLWTTOPIC, 'Offline', qos=2, retain=True)
-                    self.publish(settings.ALARMCONNECTEDTOPIC, "0", qos=2, retain=False)
+                    self.publish(settings.ALARMCONNECTEDTOPIC, "0", qos=2, retain=True)
 
         # --- TIME SYNC ---
         elif line[1:5] == "PS00":

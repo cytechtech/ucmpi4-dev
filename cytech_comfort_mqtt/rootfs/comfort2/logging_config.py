@@ -20,6 +20,8 @@
 #
 
 import logging
+import os
+import sys
 from logging.handlers import RotatingFileHandler
 
 RAM_LOG_FILE = "/dev/shm/cytech_comfort_mqtt.log"
@@ -27,27 +29,30 @@ RAM_LOG_FILE = "/dev/shm/cytech_comfort_mqtt.log"
 def setup_ram_logging(level=logging.INFO):
     root = logging.getLogger()
 
-    # already configured?
-    for handler in root.handlers:
-        if isinstance(handler, RotatingFileHandler):
-            if getattr(handler, "baseFilename", "") == RAM_LOG_FILE:
-                return
-
-    root.setLevel(logging.DEBUG)
+    root.setLevel(level)
 
     formatter = logging.Formatter(
         '%(asctime)s %(levelname)-8s [%(name)s] %(message)s',
         datefmt='%Y-%m-%d %H:%M:%S'
     )
 
-    file_handler = RotatingFileHandler(
-        RAM_LOG_FILE,
-        maxBytes=1024 * 1024,
-        backupCount=2,
-        encoding="utf-8"
-    )
+    file_handler = next((handler for handler in root.handlers
+                         if isinstance(handler, RotatingFileHandler)
+                         and handler.baseFilename == os.path.abspath(RAM_LOG_FILE)), None)
+    if file_handler is None:
+        file_handler = RotatingFileHandler(
+            RAM_LOG_FILE, maxBytes=1024 * 1024, backupCount=2, encoding="utf-8"
+        )
+        root.addHandler(file_handler)
 
     file_handler.setLevel(level)
     file_handler.setFormatter(formatter)
 
-    root.addHandler(file_handler)
+    stream_handler = next((handler for handler in root.handlers
+                           if getattr(handler, "_comfort_stdout", False)), None)
+    if stream_handler is None:
+        stream_handler = logging.StreamHandler(sys.stdout)
+        stream_handler._comfort_stdout = True
+        root.addHandler(stream_handler)
+    stream_handler.setLevel(level)
+    stream_handler.setFormatter(formatter)

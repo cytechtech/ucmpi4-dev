@@ -1,3 +1,15 @@
+## [1.0.10-dev3] - 2026-09-29
+
+### Fixed
+- Report rejected Comfort logins in the alarm message/event log and at ERROR level in the RAM and Supervisor logs; distinguish rejection during login from a later session logout.
+- Keep the bridge disconnected until login acknowledgement, and clear its connected flag on LU00.
+- Ignore retained alarm command replays and remove the retained synthetic `comm test` command after login.
+- Throttle startup-readiness warnings and include the login failure reason when known.
+
+### Changed
+- Mirror RAM logging to stdout at the configured verbosity, without duplicate handlers.
+- Mask PINs in login/arming serial TX logs and omit disarm PINs from command debug output.
+
 ## [1.0.10-dev2] - 2026-09-22
 
 ### Changed
