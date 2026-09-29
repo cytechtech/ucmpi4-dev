@@ -1,3 +1,10 @@
+## [1.0.10-dev4] - 2026-09-29
+
+### Changed
+- Remove the stdout log mirror introduced in dev3 to avoid additional host-persisted diagnostic logging. Keep the rotating RAM log at `/dev/shm/cytech_comfort_mqtt.log`.
+- Preserve login-rejection messages in both the RAM log and the MQTT Alarm Message Log, along with the other dev3 fixes.
+- Verify logging verbosity, duplicate-handler prevention and absence of stdout/stderr output in regression tests.
+
 ## [1.0.10-dev3] - 2026-09-29
 
 ### Fixed

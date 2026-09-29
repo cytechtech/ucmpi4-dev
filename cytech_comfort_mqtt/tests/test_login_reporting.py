@@ -149,27 +149,30 @@ class LoginReportingTests(unittest.TestCase):
 
 
 class LoggingTests(unittest.TestCase):
-    def test_stdout_and_file_follow_level_without_duplicate_handlers(self):
+    def test_ram_log_follows_level_without_stdout_or_duplicate_handlers(self):
         env = {'__name__': 'isolated_logging_config'}
         exec(compile((BASE / 'logging_config.py').read_text(encoding='utf-8-sig'), 'logging_config.py', 'exec'), env)
         root = logging.getLogger('test.isolated_logging_setup')
         root.propagate = False
         stream = io.StringIO()
+        stderr = io.StringIO()
         with tempfile.TemporaryDirectory() as folder:
             env['RAM_LOG_FILE'] = str(Path(folder) / 'bridge.log')
             try:
-                with patch.object(logging, 'getLogger', return_value=root), patch('sys.stdout', stream):
+                with patch.object(logging, 'getLogger', return_value=root), patch('sys.stdout', stream), patch('sys.stderr', stderr):
                     env['setup_ram_logging'](logging.INFO)
                     root.debug('hidden debug')
                     root.error('login rejected')
                     env['setup_ram_logging'](logging.DEBUG)
                     env['setup_ram_logging'](logging.DEBUG)
                     root.debug('visible debug')
-                self.assertEqual(len(root.handlers), 2)
-                self.assertNotIn('hidden debug', stream.getvalue())
-                self.assertEqual(stream.getvalue().count('login rejected'), 1)
-                self.assertIn('visible debug', stream.getvalue())
-                self.assertIn('visible debug', Path(env['RAM_LOG_FILE']).read_text())
+                self.assertEqual(len(root.handlers), 1)
+                self.assertEqual(stream.getvalue(), '')
+                self.assertEqual(stderr.getvalue(), '')
+                contents = Path(env['RAM_LOG_FILE']).read_text()
+                self.assertNotIn('hidden debug', contents)
+                self.assertEqual(contents.count('login rejected'), 1)
+                self.assertIn('visible debug', contents)
             finally:
                 for handler in root.handlers:
                     handler.close()

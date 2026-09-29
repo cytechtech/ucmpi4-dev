@@ -21,12 +21,12 @@
 
 import logging
 import os
-import sys
 from logging.handlers import RotatingFileHandler
 
 RAM_LOG_FILE = "/dev/shm/cytech_comfort_mqtt.log"
 
 def setup_ram_logging(level=logging.INFO):
+    # Keep bridge diagnostics in RAM; stdout may be persisted by the host.
     root = logging.getLogger()
 
     root.setLevel(level)
@@ -47,12 +47,3 @@ def setup_ram_logging(level=logging.INFO):
 
     file_handler.setLevel(level)
     file_handler.setFormatter(formatter)
-
-    stream_handler = next((handler for handler in root.handlers
-                           if getattr(handler, "_comfort_stdout", False)), None)
-    if stream_handler is None:
-        stream_handler = logging.StreamHandler(sys.stdout)
-        stream_handler._comfort_stdout = True
-        root.addHandler(stream_handler)
-    stream_handler.setLevel(level)
-    stream_handler.setFormatter(formatter)
