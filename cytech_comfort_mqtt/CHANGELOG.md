@@ -1,3 +1,10 @@
+## [1.0.10-dev5] - 2026-09-29
+
+### Fixed
+- Clear retained Response button discovery during MQTT startup/reconnection, alongside the other Comfort entities, so old Response buttons do not remain after a failed login.
+- Reset the Response discovery flag when clearing, allowing discovery to be recreated after a successful connection.
+- Preserve the RAM-only logging and login diagnostics from dev4.
+
 ## [1.0.10-dev4] - 2026-09-29
 
 ### Changed

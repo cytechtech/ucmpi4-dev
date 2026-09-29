@@ -540,6 +540,7 @@ class Comfort2(mqtt.Client):
             self.clear_counter_discovery()
             self.clear_sensor_discovery()
             self.clear_timer_discovery()
+            self.clear_response_discovery()
             self.clear_battery_voltage_discovery()
 
             time.sleep(0.25)    # Short wait for MQTT to be ready to accept commands.
@@ -2179,6 +2180,7 @@ class Comfort2(mqtt.Client):
 
     def clear_response_discovery(self):
         """Remove retained discovery for all supported Comfort Responses."""
+        self._responses_discovery_published = False
         for i in range(1, int(settings.MAX_RESPONSES) + 1):
             topic = f"homeassistant/button/{settings.DOMAIN}/response{i:04d}/config"
             self.publish(topic, None, qos=1, retain=True)
