@@ -33,3 +33,8 @@ The following objects are supported:
 ⚠️ This Add-on was specifically developed for Home Assistant OS. Home Assistant Container and Core have not been tested and is not supported at present.
 
 Copyright 2026 Cytech Technology Pte Ltd. Licensed under Apache-2.0. For more details see the [LICENSE](LICENSE) file.
+
+## Live alarm status dashboard
+
+The AM alarm status publisher and Home Assistant image YAML are available for testing.
+See [HA image integration](home_assistant/README.md) for the MQTT sensor and the button/table within the existing Comfort Alarm dashboard.

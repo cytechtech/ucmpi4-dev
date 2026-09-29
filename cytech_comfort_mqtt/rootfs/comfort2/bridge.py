@@ -61,6 +61,7 @@ from certificate_manager import (
 )
 from mosquitto_manager import ensure_managed_login, ensure_custom_configuration
 import comfort_protocol
+from alarm_status import AlarmStatusTracker
 from passthrough import ComfortPassthroughServer
 
 mqttc = None
@@ -474,6 +475,13 @@ class RollingMqttLog:
 class Comfort2(mqtt.Client):
 
     def init(self, mqtt_ip, mqtt_port, mqtt_username, mqtt_password, comfort_pincode, mqtt_version):
+        self.alarm_status = AlarmStatusTracker(
+            lambda payload: self.publish(settings.DOMAIN + "/alarm/am_status",
+                                         json.dumps(payload), qos=1, retain=False),
+            comfort_protocol.ComfortAMSystemAlarmReport.triggers_ha,
+        )
+        self._alarm_snapshot_due = 0.0
+        self._alarm_last_report = 0.0
         self.mqtt_ip = mqtt_ip
         self.mqtt_port = mqtt_port
         self.comfort_pincode = comfort_pincode
@@ -1103,6 +1111,9 @@ class Comfort2(mqtt.Client):
 
 
     def login(self):
+        self.alarm_status.reset()
+        self._alarm_snapshot_due = 0.0
+        self._alarm_last_report = 0.0
 
         masked = "*" * len(self.comfort_pincode)
         logger.info("Sending Comfort login LI%s", masked)
@@ -2850,6 +2861,7 @@ class Comfort2(mqtt.Client):
 
                 # If passthrough mode is active, skip serial connection and just keep the MQTT loop running
                 if settings.PASSTHROUGH_ACTIVE:
+                    self.alarm_status.heartbeat(False)
                     time.sleep(0.5)
                     continue
 
@@ -2881,6 +2893,7 @@ class Comfort2(mqtt.Client):
 
                 finally:
 
+                    self.alarm_status.heartbeat(False)
                     self.serial_running = False
 
                     if self.serial:
@@ -2973,6 +2986,13 @@ class Comfort2(mqtt.Client):
                     time.sleep(1)
 
     def process_serial_queue(self):
+        monitoring = bool(settings.COMFORTCONNECTED and not settings.PASSTHROUGH_ACTIVE
+                          and self.serial is not None and self.serial.is_open)
+        self.alarm_status.heartbeat(monitoring and self._alarm_last_report > 0
+                                    and time.monotonic() - self._alarm_last_report < 90)
+        if monitoring and time.monotonic() >= self._alarm_snapshot_due:
+            self._alarm_snapshot_due = time.monotonic() + 30
+            self.serial.write(b"\x03a?\r")
         for _ in range(100):  # optional burst limit
             try:
                 line = self.serial_queue.get_nowait()
@@ -2997,6 +3017,7 @@ class Comfort2(mqtt.Client):
 
 
     def handle_serial_line(self, line):
+        self._alarm_last_report = time.monotonic()
         # --- LOGIN ---
         if line[1:3] == "LU":
             luMsg = comfort_protocol.ComfortLUUserLoggedIn(line[1:])
@@ -3254,6 +3275,7 @@ class Comfort2(mqtt.Client):
 
         elif line[1:3] == "a?":
             aMsg = comfort_protocol.Comfort_A_SecurityInformationReport(line[1:])
+            self.alarm_status.snapshot(aMsg)
             self.publish(settings.ALARMSTATUSTOPIC, aMsg.state, qos=2, retain=True)
             if aMsg.type == 'LowBattery':
                 logging.warning("Low Battery - %s", aMsg.battery)
@@ -3288,6 +3310,8 @@ class Comfort2(mqtt.Client):
         # --- ALARM ---
         elif line[1:3] == "AM":
             amMsg = comfort_protocol.ComfortAMSystemAlarmReport(line[1:])
+            self.alarm_status.event(amMsg)
+            self._alarm_snapshot_due = 0.0
             self.publish_alarm_message(amMsg.message, retain=True)
             if amMsg.triggered:
                 self.publish(settings.ALARMSTATETOPIC, "triggered", qos=2, retain=False)
@@ -3295,6 +3319,8 @@ class Comfort2(mqtt.Client):
 
         elif line[1:3] == "AR":
             arMsg = comfort_protocol.ComfortARSystemAlarmReport(line[1:])
+            self.alarm_status.event(arMsg, restored=True)
+            self._alarm_snapshot_due = 0.0
             self.publish_alarm_message(arMsg.message, retain=True)
 
         # --- ENTRY/EXIT ---

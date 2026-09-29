@@ -339,11 +339,15 @@ class ComfortERArmReadyNotReady(object):
         self.zone = int(data[2:4],16)
 
 class ComfortAMSystemAlarmReport(object):
+    @staticmethod
+    def triggers_ha(alarm):
+        return alarm not in {1, 2, 3, 4, 7, 8, 9, 12, 13, 15, 17, 19, 22, 23, 24, 25, 26}
+
     def __init__(self, data={}):
         
 
         self.alarm = int(data[2:4],16)
-        self.triggered = True               # For Comfort Alarm State Alert, Trouble, Alarm
+        self.triggered = self.triggers_ha(self.alarm)
         self.parameter = int(data[4:6],16)
         low_battery = ['','Slave 1','Slave 2','Slave 3','Slave 4','Slave 5','Slave 6','Slave 7']
         if settings.ZONEMAPFILE:

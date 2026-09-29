@@ -1,3 +1,13 @@
+## [1.0.10-dev2] - 2026-09-22
+
+### Changed
+- AM codes 1, 2, 3, 4, 7, 22, 25 and 26 preserve their event messages without publishing `triggered`.
+
+### Added
+- Live AM/AR status publisher with per-device observations, current trouble bits, and offline handling.
+- HA image YAML for an Alarm & Trouble Status button and live table within the existing Comfort Alarm dashboard.
+- Regression tests for alarm policy, restores, status updates and dashboard templates.
+
 ## [1.0.10] - 2026-09-09
 
 ### Changed
