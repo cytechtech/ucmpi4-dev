@@ -15,10 +15,10 @@ class ZoneBypassTests(unittest.TestCase):
         tree = ast.parse((BASE / 'bridge.py').read_text(encoding='utf-8-sig'))
         cls = next(n for n in tree.body if isinstance(n, ast.ClassDef) and n.name == 'Comfort2')
         methods = [n for n in cls.body if isinstance(n, ast.FunctionDef) and n.name in {
-            'handle_zone_bypass_command', 'publish_zone_bypass_discovery', 'publish_zone_bypass_state'}]
+            'handle_zone_bypass_command', 'publish_zone_bypass_discovery', 'publish_zone_bypass_state', 'publish_input_discovery'}]
         self.settings = SimpleNamespace(DOMAIN='comfort', COMFORT_INPUTS=96, COMFORTCONNECTED=True,
             PASSTHROUGH_ACTIVE=False, ALARMAVAILABLETOPIC='available', ALARMCONNECTEDTOPIC='connected')
-        env = dict(settings=self.settings, re=re, json=json, datetime=datetime, logger=logging.getLogger('test.bypass'))
+        env = dict(time=SimpleNamespace(sleep=Mock()), settings=self.settings, re=re, json=json, datetime=datetime, logger=logging.getLogger('test.bypass'))
         wrapper=ast.ClassDef(name='Bridge', bases=[], keywords=[], body=methods, decorator_list=[])
         exec(compile(ast.fix_missing_locations(ast.Module(body=[wrapper], type_ignores=[])), 'bridge.py','exec'),env)
         self.bridge=env['Bridge']()
@@ -62,6 +62,32 @@ class ZoneBypassTests(unittest.TestCase):
         self.bridge.publish.assert_called_with('comfort/zone/10/bypass/state','Bypassed',qos=1,retain=True)
         self.bridge.publish_zone_bypass_state(10,0)
         self.bridge.publish.assert_called_with('comfort/zone/10/bypass/state','Not bypassed',qos=1,retain=True)
+
+    def test_discovery_requests_bulk_status_after_publishing_entities(self):
+        self.settings.COMFORT_INPUTS=2
+        self.settings.ZONEMAPFILE=False
+        self.settings.ALARMINPUTTOPIC='comfort/input%d'
+        events=[]
+        self.bridge.publish.side_effect=lambda *a, **k: events.append('publish')
+        self.bridge.serial.write.side_effect=lambda value: events.append(value)
+        self.bridge.publish_input_discovery({'identifiers':['comfort']})
+        self.assertEqual(events.count('publish'),8)
+        self.assertEqual(events[-1],b'\x03b?00\r')
+        self.bridge.serial.write.assert_called_once_with(b'\x03b?00\r')
+
+    def test_discovery_never_queries_offline_or_in_passthrough(self):
+        self.settings.COMFORT_INPUTS=1
+        self.settings.ZONEMAPFILE=False
+        self.settings.ALARMINPUTTOPIC='comfort/input%d'
+        self.bridge.connected=False
+        self.bridge.publish_input_discovery({})
+        self.bridge.connected=True
+        self.settings.PASSTHROUGH_ACTIVE=True
+        self.bridge.publish_input_discovery({})
+        self.settings.PASSTHROUGH_ACTIVE=False
+        self.bridge.serial.is_open=False
+        self.bridge.publish_input_discovery({})
+        self.bridge.serial.write.assert_not_called()
 
     def test_protocol_bulk_bit_order_and_nonzero_by(self):
         tree=ast.parse((BASE/'comfort_protocol.py').read_text(encoding='utf-8-sig'))

@@ -2420,6 +2420,15 @@ class Comfort2(mqtt.Client):
             self.publish(discovery_topic, json.dumps(payload), qos=1, retain=True)
             time.sleep(0.05)
 
+        # Discovery cleanup removes retained bypass observations. Ask the panel
+        # again after publishing the zone entities, including startup reloads.
+        if (self.connected and settings.COMFORTCONNECTED
+                and not settings.PASSTHROUGH_ACTIVE
+                and getattr(self.serial, "is_open", False)):
+            self.serial.write(b"\x03b?00\r")
+            settings.SAVEDTIME = datetime.now()
+
+
 
     def publish_flag_discovery(self, mqtt_device):
         for key, value in settings.flag_properties.items():
