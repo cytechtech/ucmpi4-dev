@@ -1,3 +1,7 @@
+## 1.0.10-dev8
+
+- Remove misleading ValueError debug message for normal repeated BY/B? unbypass confirmations.
+
 ## 1.0.10-dev7
 
 - Query all zone bypass states after zone discovery so startup/reload cleanup does not leave statuses unknown. No bypass settings are changed.

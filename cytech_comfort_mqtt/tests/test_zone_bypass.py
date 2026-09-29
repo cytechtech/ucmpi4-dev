@@ -102,6 +102,13 @@ class ZoneBypassTests(unittest.TestCase):
         self.assertIn(5,self.settings.BYPASSEDZONES)
         env['ComfortBYBypassActivationReport']('B?0500')
         self.assertNotIn(5,self.settings.BYPASSEDZONES)
+        before=list(self.settings.BYPASSEDZONES)
+        env['logger']=Mock()
+        for report in ('BY0500','B?0500','BY0600','B?0600'):
+            env['ComfortBYBypassActivationReport'](report)
+        self.assertEqual(self.settings.BYPASSEDZONES,before)
+        env['logger'].debug.assert_not_called()
+
 
 if __name__=='__main__':
     unittest.main()

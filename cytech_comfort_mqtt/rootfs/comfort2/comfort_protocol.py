@@ -150,8 +150,7 @@ class ComfortBYBypassActivationReport(object):
                 settings.BYPASSEDZONES.remove(self.zone)
                 if settings.BYPASSEDZONES.count(-1) == 0 and len(settings.BYPASSEDZONES) == 0:
                     settings.BYPASSEDZONES.append(0)        
-            else:
-                logger.debug("ValueError Exception: Bypassed Zone (%s) does not appear in settings.BYPASSEDZONES List[]", self.zone)
+            # Repeated BY/B? clear confirmations are normal and need no action.
         elif (self.state > 0) and (self.zone <= int(settings.COMFORT_INPUTS)):  # Any nonzero state means bypassed
             if (self.zone not in settings.BYPASSEDZONES):
                 settings.BYPASSEDZONES.append(self.zone)
