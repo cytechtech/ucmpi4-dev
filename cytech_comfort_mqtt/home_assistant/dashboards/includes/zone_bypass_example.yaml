@@ -1,0 +1,13 @@
+# Reference card for zone 1. Repeat per zone, replacing 001 with 002 etc.
+# Verify entity IDs in HA if an existing entity registry has renamed them.
+type: entities
+title: Zone 1
+entities:
+  - entity: binary_sensor.cytech_comfort_mqtt_input001
+    name: Zone state
+  - entity: sensor.cytech_comfort_mqtt_zone001_bypass
+    name: Bypass status
+  - entity: button.cytech_comfort_mqtt_zone001_bypass_set
+    name: Set bypass
+  - entity: button.cytech_comfort_mqtt_zone001_bypass_clear
+    name: Clear bypass

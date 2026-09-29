@@ -550,6 +550,7 @@ class Comfort2(mqtt.Client):
             self.subscribe(f"{settings.DOMAIN}/passthrough/set")
             logger.info("Subscribed to passthrough control topic: %s", f"{settings.DOMAIN}/passthrough/set")
 
+            self.subscribe(f"{settings.DOMAIN}/zone/+/bypass/set")
             self.subscribe(settings.ALARMCOMMANDTOPIC)
             self.subscribe(settings.REFRESHTOPIC)
             self.subscribe(settings.RELOADTOPIC, qos=1)
@@ -650,6 +651,9 @@ class Comfort2(mqtt.Client):
     def on_message(self, client, userdata, msg):    #=0
         if msg.topic == settings.ALARMCOMMANDTOPIC and getattr(msg, "retain", False):
             logger.warning("Ignoring retained alarm command replay on %s", msg.topic)
+            return
+        if msg.topic.startswith(f"{settings.DOMAIN}/zone/") and msg.topic.endswith("/bypass/set"):
+            self.handle_zone_bypass_command(msg)
             return
         payload_raw = (msg.payload or b"").decode("utf-8", errors="replace").strip()
 
@@ -2102,6 +2106,11 @@ class Comfort2(mqtt.Client):
         max_inputs = int(getattr(settings, "MAX_ZONES", 128) or 128)
  
         for i in range(1, max_inputs + 1):
+            # Discard old observations until the new panel snapshot arrives.
+            self.publish(f"{settings.DOMAIN}/zone/{i}/bypass/state", None, qos=1, retain=True)
+            for component, suffix in (("sensor", "bypass"), ("button", "bypass_set"), ("button", "bypass_clear")):
+                self.publish(f"homeassistant/{component}/{settings.DOMAIN}/zone{i:03d}_{suffix}/config",
+                             None, qos=1, retain=True)
             topics = [
                 # current padded format
                 f"homeassistant/binary_sensor/{settings.DOMAIN}/input{i:03d}/config",
@@ -2303,6 +2312,54 @@ class Comfort2(mqtt.Client):
             time.sleep(0.05)
 
 
+    def handle_zone_bypass_command(self, msg):
+        # Commands are momentary actions; never replay a retained request.
+        if getattr(msg, "retain", False):
+            logger.warning("Ignoring retained zone bypass command")
+            return
+        match = re.fullmatch(re.escape(settings.DOMAIN) + r"/zone/([0-9]+)/bypass/set", msg.topic)
+        if not match:
+            return
+        zone = int(match.group(1))
+        action = (msg.payload or b"").decode("utf-8", errors="replace").strip()
+        if not 1 <= zone <= min(int(settings.COMFORT_INPUTS), 255) or action not in ("SET", "CLEAR"):
+            logger.warning("Invalid zone bypass request")
+            return
+        if (not self.connected or not settings.COMFORTCONNECTED
+                or settings.PASSTHROUGH_ACTIVE or not getattr(self.serial, "is_open", False)):
+            logger.warning("Zone bypass request ignored: Comfort not connected")
+            return
+        code = "4B" if action == "SET" else "4C"
+        self.serial.write(f"\x03DA{code}{zone:02X}\r".encode())
+        self.serial.write(f"\x03B?{zone:02X}\r".encode())
+        settings.SAVEDTIME = datetime.now()
+        logger.info("Zone %d bypass %s requested", zone, action.lower())
+
+    def publish_zone_bypass_state(self, zone, state):
+        if 1 <= zone <= int(settings.COMFORT_INPUTS):
+            self.publish(f"{settings.DOMAIN}/zone/{zone}/bypass/state",
+                         "Bypassed" if state else "Not bypassed", qos=1, retain=True)
+
+    def publish_zone_bypass_discovery(self, zone, name, mqtt_device):
+        common = {
+            "availability": [
+                {"topic": settings.ALARMAVAILABLETOPIC, "payload_available": "1", "payload_not_available": "0"},
+                {"topic": settings.ALARMCONNECTEDTOPIC, "payload_available": "1", "payload_not_available": "0"},
+            ],
+            "availability_mode": "all", "device": mqtt_device,
+        }
+        for component, suffix, label in (("sensor", "bypass", "Bypass status"),
+                ("button", "bypass_set", "Set bypass"), ("button", "bypass_clear", "Clear bypass")):
+            ident = f"{settings.DOMAIN}_zone{zone:03d}_{suffix}"
+            payload = dict(common, name=f"{name} {label}", unique_id=ident, object_id=ident)
+            if component == "sensor":
+                payload.update(state_topic=f"{settings.DOMAIN}/zone/{zone}/bypass/state", icon="mdi:shield-off-outline")
+            else:
+                payload.update(command_topic=f"{settings.DOMAIN}/zone/{zone}/bypass/set",
+                               payload_press="SET" if suffix == "bypass_set" else "CLEAR", retain=False, qos=1)
+            self.publish(f"homeassistant/{component}/{settings.DOMAIN}/zone{zone:03d}_{suffix}/config",
+                         json.dumps(payload), qos=1, retain=True)
+
     def publish_input_discovery(self, mqtt_device):
         try:
             max_inputs = int(settings.COMFORT_INPUTS)
@@ -2328,6 +2385,7 @@ class Comfort2(mqtt.Client):
                 except Exception:
                     logger.warning("INPUT %03d props malformed: %r", i, props)
 
+            self.publish_zone_bypass_discovery(i, name, mqtt_device)
             state_topic = settings.ALARMINPUTTOPIC % i
             discovery_topic = f"homeassistant/binary_sensor/{settings.DOMAIN}/input{i:03d}/config"
 
@@ -3467,7 +3525,14 @@ class Comfort2(mqtt.Client):
             if len(line) <= 5 or (len(line) - 5) % 2 != 0:
                 logger.warning("Ignoring truncated b? message: %r", line)
                 return
+            try:
+                bytes.fromhex(line[5:])
+            except ValueError:
+                logger.warning("Ignoring invalid b? message")
+                return
             bMsg = comfort_protocol.ComfortB_ReportAllBypassZones(line[1:])
+            for zone in range(1, min(int(settings.COMFORT_INPUTS), (len(line) - 5) * 4) + 1):
+                self.publish_zone_bypass_state(zone, settings.BypassCache[zone])
             if bMsg.value == 0:
                 self.publish(settings.ALARMBYPASSTOPIC, 0, qos=2, retain=True)
             else:
@@ -3495,11 +3560,14 @@ class Comfort2(mqtt.Client):
             time.sleep(0.01)
 
         # --- BYPASS CHANGE ---
-        elif line[1:3] == "BY":
-            if not settings.CacheState:
-                logger.debug("Ignoring BY (CacheState=False): %s", line)
+        elif line[1:3] in ("BY", "B?"):
+            if len(line) != 7 or not re.fullmatch(r"[0-9A-Fa-f]{4}", line[3:]):
+                logger.warning("Ignoring invalid bypass report: %r", line)
+                return
+            if not 1 <= int(line[3:5], 16) <= int(settings.COMFORT_INPUTS):
                 return
             byMsg = comfort_protocol.ComfortBYBypassActivationReport(line[1:])
+            self.publish_zone_bypass_state(byMsg.zone, byMsg.state)
             settings.BypassCache[byMsg.zone] = byMsg.state if byMsg.zone <= int(settings.COMFORT_INPUTS) else None
 
             if byMsg.zone <= int(settings.COMFORT_INPUTS):

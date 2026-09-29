@@ -152,7 +152,7 @@ class ComfortBYBypassActivationReport(object):
                     settings.BYPASSEDZONES.append(0)        
             else:
                 logger.debug("ValueError Exception: Bypassed Zone (%s) does not appear in settings.BYPASSEDZONES List[]", self.zone)
-        elif (self.state == 1) and (self.zone <= int(settings.COMFORT_INPUTS)):                     # State == 1 meaning must be in bypasszones
+        elif (self.state > 0) and (self.zone <= int(settings.COMFORT_INPUTS)):  # Any nonzero state means bypassed
             if (self.zone not in settings.BYPASSEDZONES):
                 settings.BYPASSEDZONES.append(self.zone)
             if settings.BYPASSEDZONES.count(0) >= 1:        

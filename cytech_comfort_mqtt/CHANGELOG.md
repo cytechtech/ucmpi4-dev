@@ -1,3 +1,8 @@
+## 1.0.10-dev6
+
+- Add per-zone Set bypass and Clear bypass MQTT buttons and panel-confirmed status.
+- Handle individual B? replies and nonzero BY states; ignore retained bypass commands and commands while disconnected.
+
 ## [1.0.10-dev5] - 2026-09-29
 
 ### Fixed
