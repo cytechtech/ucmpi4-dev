@@ -1,55 +1,17 @@
-## 1.0.10-dev9
-
-- Validate a? reply length and hexadecimal format before parsing. Invalid replies log a short warning and preserve the last valid status. Serial reader and polling timing unchanged.
-
-## 1.0.10-dev8
-
-- Remove misleading ValueError debug message for normal repeated BY/B? unbypass confirmations.
-
-## 1.0.10-dev7
-
-- Query all zone bypass states after zone discovery so startup/reload cleanup does not leave statuses unknown. No bypass settings are changed.
-
-## 1.0.10-dev6
-
-- Add per-zone Set bypass and Clear bypass MQTT buttons and panel-confirmed status.
-- Handle individual B? replies and nonzero BY states; ignore retained bypass commands and commands while disconnected.
-
-## [1.0.10-dev5] - 2026-09-29
-
-### Fixed
-- Clear retained Response button discovery during MQTT startup/reconnection, alongside the other Comfort entities, so old Response buttons do not remain after a failed login.
-- Reset the Response discovery flag when clearing, allowing discovery to be recreated after a successful connection.
-- Preserve the RAM-only logging and login diagnostics from dev4.
-
-## [1.0.10-dev4] - 2026-09-29
-
-### Changed
-- Remove the stdout log mirror introduced in dev3 to avoid additional host-persisted diagnostic logging. Keep the rotating RAM log at `/dev/shm/cytech_comfort_mqtt.log`.
-- Preserve login-rejection messages in both the RAM log and the MQTT Alarm Message Log, along with the other dev3 fixes.
-- Verify logging verbosity, duplicate-handler prevention and absence of stdout/stderr output in regression tests.
-
-## [1.0.10-dev3] - 2026-09-29
-
-### Fixed
-- Report rejected Comfort logins in the alarm message/event log and at ERROR level in the RAM and Supervisor logs; distinguish rejection during login from a later session logout.
-- Keep the bridge disconnected until login acknowledgement, and clear its connected flag on LU00.
-- Ignore retained alarm command replays and remove the retained synthetic `comm test` command after login.
-- Throttle startup-readiness warnings and include the login failure reason when known.
-
-### Changed
-- Mirror RAM logging to stdout at the configured verbosity, without duplicate handlers.
-- Mask PINs in login/arming serial TX logs and omit disarm PINs from command debug output.
-
-## [1.0.10-dev2] - 2026-09-22
-
-### Changed
-- AM codes 1, 2, 3, 4, 7, 22, 25 and 26 preserve their event messages without publishing `triggered`.
+## [1.0.11] - Unreleased
 
 ### Added
-- Live AM/AR status publisher with per-device observations, current trouble bits, and offline handling.
-- HA image YAML for an Alarm & Trouble Status button and live table within the existing Comfort Alarm dashboard.
-- Regression tests for alarm policy, restores, status updates and dashboard templates.
+- Live Alarm & Trouble Status reporting. 
+- Per-zone Set bypass and Clear bypass buttons with panel-confirmed status, including initial bypass states after discovery.
+
+### Changed
+- Selected trouble and informational alarm reports remain visible in the alarm log without setting the Home Assistant alarm state to Triggered.
+
+### Fixed
+- Report rejected logins in the MQTT Alarm Message Log and rotating RAM log, distinguish login rejection from session logout, and keep connection status offline until login succeeds.
+- Masked PINs in login and arming debug logs, omit disarm PINs, and throttle startup-readiness warnings with the known login failure reason.
+- Clear the retained synthetic communication-test command.
+- Clear stale Response discovery on MQTT startup/reconnection and recreate it after a successful connection.
 
 ## [1.0.10] - 2026-09-09
 

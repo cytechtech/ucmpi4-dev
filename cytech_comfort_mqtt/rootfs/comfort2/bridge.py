@@ -3072,10 +3072,17 @@ class Comfort2(mqtt.Client):
     def process_serial_queue(self):
         monitoring = bool(settings.COMFORTCONNECTED and not settings.PASSTHROUGH_ACTIVE
                           and self.serial is not None and self.serial.is_open)
+        # Events provide immediate updates; snapshots reconcile current trouble
+        # bits at startup/reconnection, after AM/AR, and every five minutes.
+        snapshot_interval = 300
+        response_grace = 30
+        now = time.monotonic()
+        # This timestamp tracks all received serial reports, not just alarms.
+        # A quiet panel is healthy until the next snapshot plus its reply window.
         self.alarm_status.heartbeat(monitoring and self._alarm_last_report > 0
-                                    and time.monotonic() - self._alarm_last_report < 90)
-        if monitoring and time.monotonic() >= self._alarm_snapshot_due:
-            self._alarm_snapshot_due = time.monotonic() + 30
+                                    and now - self._alarm_last_report < snapshot_interval + response_grace)
+        if monitoring and now >= self._alarm_snapshot_due:
+            self._alarm_snapshot_due = now + snapshot_interval
             self.serial.write(b"\x03a?\r")
         for _ in range(100):  # optional burst limit
             try:
@@ -3118,6 +3125,7 @@ class Comfort2(mqtt.Client):
 
                 self.connected = True
                 settings.COMFORTCONNECTED = True
+                self._alarm_snapshot_due = 0.0
 
                 self.publish(settings.ALARMCONNECTEDTOPIC, 1, qos=2, retain=True)
                 if login_error:
