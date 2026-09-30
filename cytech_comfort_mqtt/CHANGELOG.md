@@ -1,3 +1,7 @@
+## 1.0.10-dev9
+
+- Validate a? reply length and hexadecimal format before parsing. Invalid replies log a short warning and preserve the last valid status. Serial reader and polling timing unchanged.
+
 ## 1.0.10-dev8
 
 - Remove misleading ValueError debug message for normal repeated BY/B? unbypass confirmations.

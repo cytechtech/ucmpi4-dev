@@ -22,11 +22,11 @@ cards:
 
       {% if rows %}
       <table>
-      <thead><tr><th>AM code</th><th>Event</th><th>Triggers HA?</th><th>Current status</th><th>Last observation (UTC)</th><th>Details</th></tr></thead>
+      <thead><tr><th>AM code</th><th>Event</th><th>Triggers HA?</th><th>Current status</th><th>Last observation (UTC)</th><th>Panel details</th></tr></thead>
       <tbody>
       {% for row in rows %}
       {% set status = row.status if live else 'Unknown' %}
-      <tr><td>{{ row.code }}</td><td>{{ row.name | e }}</td><td>{{ 'Yes' if row.triggers else 'No' }}</td><td>{{ {'Active': '🔴 Active', 'Cleared': '🟢 Cleared', 'Event received': '🔵 Event received', 'Unknown': '⚪ Unknown'}.get(status, '⚪ Unknown') }}</td><td>{{ (row.updated or 'Not observed') | replace('T', ' ') | replace('+00:00', '') | e }}</td><td>{{ (row.message or '—') | e }}<br><small>{{ row.source | e }}</small>{% if not live and row.updated %}<br>Last known: {{ row.last_status | e }}{% endif %}</td></tr>
+      <tr><td>{{ row.code }}</td><td>{{ row.name | e }}</td><td>{{ 'Yes' if row.triggers else 'No' }}</td><td>{{ {'Active': '🔴 Active', 'Cleared': '🟢 Cleared', 'Event received': '🔵 Event received', 'Unknown': '⚪ Unknown'}.get(status, '⚪ Unknown') }}</td><td>{{ (row.updated or 'Not observed') | replace('T', ' ') | replace('+00:00', '') | e }}</td><td>{{ (row.message or '') | e }}{% if not live and row.updated %}{% if row.message %}<br>{% endif %}Last known: {{ row.last_status | e }}{% endif %}</td></tr>
       {% endfor %}
       </tbody>
       </table>

@@ -3376,6 +3376,11 @@ class Comfort2(mqtt.Client):
             self.UpdateDeviceInfo(True)
 
         elif line[1:3] == "a?":
+            # Nine hex bytes are required. Keep the last valid snapshot when a
+            # partial or malformed reply arrives; the next normal poll retries.
+            if not re.fullmatch(r"[0-9A-Fa-f]{18}", line[3:]):
+                logger.warning("Ignoring incomplete or malformed a? reply (payload length %d)", len(line[3:]))
+                return
             aMsg = comfort_protocol.Comfort_A_SecurityInformationReport(line[1:])
             self.alarm_status.snapshot(aMsg)
             self.publish(settings.ALARMSTATUSTOPIC, aMsg.state, qos=2, retain=True)
