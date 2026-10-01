@@ -1,4 +1,4 @@
-## [1.0.11] - Unreleased
+## [1.0.11] 2026-10-01
 
 ### Added
 - Live Alarm & Trouble Status reporting. 
