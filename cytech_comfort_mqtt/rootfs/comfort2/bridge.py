@@ -109,38 +109,26 @@ if serial_mode == "CM4Pi on CM9001":
 else:
     settings.COMFORT_BAUDRATE = 115200
 
-def enable_passthrough_mode():
-    global mqttc
-
-    settings.PASSTHROUGH_ACTIVE = True
-    try:
-        mqttc.publish(settings.DOMAIN + "/passthrough/state", "ON", retain=True)
-    except Exception:
-        pass
-
-    logger.warning("Manual Comfigurator mode enabled")
-
-    try:
-        if mqttc is not None and mqttc.serial is not None:
-            logger.warning("Closing Comfort serial port for Comfigurator mode")
-
-            mqttc.serial_running = False
-            time.sleep(1.0)
-
-            if mqttc.serial is not None and mqttc.serial.is_open:
-                mqttc.serial.close()
-
-    except Exception:
-        logger.exception("Failed to close Comfort serial for Comfigurator mode")
+PASSTHROUGH_STATE_FILE = Path("/run/comfort-passthrough-mode")
+passthrough_requested = False
+passthrough_request_changed = threading.Event()
 
 
-def disable_passthrough_mode():
-    settings.PASSTHROUGH_ACTIVE = False
-    try:
-      mqttc.publish(settings.DOMAIN + "/passthrough/state", "OFF", retain=True)
-    except Exception:
-        pass
-    logger.warning("Manual Comfigurator mode disabled; returning to MQTT bridge")
+def request_passthrough_mode(active):
+    global passthrough_requested
+
+    passthrough_requested = active
+    passthrough_request_changed.set()
+    logger.info("Requested Comfort bridge mode: %s", "Comfigurator" if active else "MQTT")
+
+
+def report_passthrough_mode(mode):
+    pending_file = PASSTHROUGH_STATE_FILE.with_suffix(".tmp")
+    pending_file.write_text(mode, encoding="utf-8")
+    pending_file.replace(PASSTHROUGH_STATE_FILE)
+    if mqttc is not None and mode in ("ON", "OFF", "unavailable"):
+        mqttc.publish(settings.DOMAIN + "/passthrough/state", "ON" if mode == "ON" else "OFF", retain=True)
+    logger.info("Comfort bridge mode: %s", mode)
 
 
 def start_passthrough_mode():
@@ -158,6 +146,7 @@ settings.PASSTHROUGH_ENABLED = get_bool(_opts, "passthrough_enabled", False)
 passthrough_server = None
 
 if settings.PASSTHROUGH_ENABLED:
+    report_passthrough_mode("transition")
     passthrough_server = ComfortPassthroughServer(
         port=settings.PASSTHROUGH_PORT,
         serial_port="/dev/serial0",
@@ -556,7 +545,7 @@ class Comfort2(mqtt.Client):
 
             # You need to subscribe to your own topics to enable publish messages activating Comfort entities.
 
-            self.subscribe(f"{settings.DOMAIN}/passthrough/set")
+            self.subscribe(f"{settings.DOMAIN}/passthrough/set", qos=1)
             logger.info("Subscribed to passthrough control topic: %s", f"{settings.DOMAIN}/passthrough/set")
 
             self.subscribe(f"{settings.DOMAIN}/zone/+/bypass/set")
@@ -897,13 +886,17 @@ class Comfort2(mqtt.Client):
             self.queue_sensor_update(sensor, state)
  
         elif msg.topic == settings.DOMAIN + "/passthrough/set":
+            if getattr(msg, "retain", False):
+                logger.warning("Ignoring retained Comfigurator mode command")
+                return
             cmd = msgstr.strip().upper()
 
             if cmd == "ON":
-                enable_passthrough_mode()
+                if passthrough_server is not None:
+                    request_passthrough_mode(True)
 
             elif cmd == "OFF":
-                disable_passthrough_mode()
+                request_passthrough_mode(False)
 
             else:
                 logger.warning("Unknown passthrough command: %s", msgstr)
@@ -2976,19 +2969,39 @@ class Comfort2(mqtt.Client):
 
         self.loop_start()
         
+        reported_mode = None
+
         try:
             while settings.RUN:
+                passthrough_request_changed.clear()
+                if passthrough_server is not None:
+                    if passthrough_requested and passthrough_server.listening:
+                        settings.PASSTHROUGH_ACTIVE = True
+                        if reported_mode != "ON":
+                            report_passthrough_mode("ON")
+                            reported_mode = "ON"
+                        self.alarm_status.heartbeat(False)
+                        passthrough_request_changed.wait(0.5)
+                        continue
 
-                # If passthrough mode is active, skip serial connection and just keep the MQTT loop running
-                if settings.PASSTHROUGH_ACTIVE:
-                    self.alarm_status.heartbeat(False)
-                    time.sleep(0.5)
-                    continue
+                    if settings.PASSTHROUGH_ACTIVE:
+                        report_passthrough_mode("transition")
+                        settings.PASSTHROUGH_ACTIVE = False
+                        reported_mode = "transition"
+
+                    if passthrough_server.client_connected:
+                        time.sleep(0.05)
+                        continue
+
+                    mode = "OFF" if passthrough_server.listening else "unavailable"
+                    if reported_mode != mode:
+                        report_passthrough_mode(mode)
+                        reported_mode = mode
 
                 self.serial = None
 
+                reader = None
                 try:
-                    
                     logger.info("Opening Comfort serial port /dev/serial0 @ %d", settings.COMFORT_BAUDRATE)
                     self.serial = LoggedSerial(
                         port='/dev/serial0',
@@ -2997,12 +3010,18 @@ class Comfort2(mqtt.Client):
                     )
 
                     self.serial_running = True
-                    threading.Thread(target=self.serial_reader, daemon=True).start()
+                    reader = threading.Thread(target=self.serial_reader, daemon=True)
+                    reader.start()
 
                     self.login()
                     settings.SAVEDTIME = datetime.now()
 
                     while settings.RUN and self.serial_running:
+                        if passthrough_requested and passthrough_server is not None and passthrough_server.listening:
+                            report_passthrough_mode("transition")
+                            reported_mode = "transition"
+                            break
+
 
                         self.process_serial_queue()
 
@@ -3015,6 +3034,8 @@ class Comfort2(mqtt.Client):
 
                     self.alarm_status.heartbeat(False)
                     self.serial_running = False
+                    if reader is not None:
+                        reader.join()
 
                     if self.serial:
                         try:
@@ -3039,7 +3060,7 @@ class Comfort2(mqtt.Client):
                         retain=False
                     )
 
-                time.sleep(settings.RETRY.seconds)
+                passthrough_request_changed.wait(settings.RETRY.seconds)
 
         except KeyboardInterrupt:
             logger.info('Shutting down.')

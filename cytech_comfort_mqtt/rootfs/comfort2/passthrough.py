@@ -61,6 +61,16 @@ class ComfortPassthroughServer:
         self._active_client = None
         self._server_socket = None
         self._client_lock = threading.Lock()
+        self._listening = threading.Event()
+
+    @property
+    def listening(self):
+        return self._listening.is_set()
+
+    @property
+    def client_connected(self):
+        with self._client_lock:
+            return self._active_client is not None
 
     def start(self):
         if self._thread and self._thread.is_alive():
@@ -116,6 +126,7 @@ class ComfortPassthroughServer:
                 server.bind((self.host, self.port))
                 server.listen(1)
                 server.settimeout(1.0)
+                self._listening.set()
 
                 while not self._stop_event.is_set():
                     try:
@@ -163,6 +174,7 @@ class ComfortPassthroughServer:
             logger.exception("Comfort passthrough server failed")
 
         finally:
+            self._listening.clear()
             self._server_socket = None
 
 
@@ -200,7 +212,7 @@ class ComfortPassthroughServer:
 
                 last_activity = time.time()
 
-                while not self._stop_event.is_set():
+                while settings.PASSTHROUGH_ACTIVE and not self._stop_event.is_set():
                     activity = False
 
                     # TCP -> Comfort serial

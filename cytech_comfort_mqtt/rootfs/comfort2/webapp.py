@@ -140,57 +140,45 @@ DOMAIN = settings.DOMAIN
 RELOAD_TOPIC = f"{DOMAIN}/reload"
 
 PASSTHROUGH_TOPIC = f"{DOMAIN}/passthrough/set"
-PASSTHROUGH_STATE_FILE = DATA_DIR / "passthrough_mode.json"
+PASSTHROUGH_STATE_FILE = Path("/run/comfort-passthrough-mode")
 passthrough_enabled = get_bool(_opts, "passthrough_enabled", False)
 
 
-def _get_passthrough_mode() -> bool:
+def _get_passthrough_mode() -> str:
     try:
-        if PASSTHROUGH_STATE_FILE.exists():
-            state = json.loads(
-                PASSTHROUGH_STATE_FILE.read_text(encoding="utf-8")
-            )
-            return state.get("active", False)
+        return PASSTHROUGH_STATE_FILE.read_text(encoding="utf-8").strip()
+    except FileNotFoundError:
+        return "unknown"
+
+
+def _set_passthrough_mode(active: bool):
+    if not passthrough_enabled:
+        return "Comfigurator passthrough is disabled in the add-on configuration.", 409
+
+    target = "ON" if active else "OFF"
+    try:
+        mqtt_publish_command(PASSTHROUGH_TOPIC, target)
     except Exception:
-        logger.exception("Failed reading passthrough state")
+        logger.exception("Failed sending Comfigurator mode command")
+        return "Could not confirm delivery of the mode command to the MQTT broker.", 502
 
-    return False
-
-
-def _set_passthrough_mode(active: bool) -> None:
-    PASSTHROUGH_STATE_FILE.write_text(
-        json.dumps({"active": active}),
-        encoding="utf-8"
-    )
-
-    c = mqtt.Client(mqtt.CallbackAPIVersion.VERSION2)
-
-    if settings.MQTTUSERNAME:
-        c.username_pw_set(settings.MQTTUSERNAME, settings.MQTTPASSWORD or "")
-
-    configure_client_tls(
-        c,
-        enabled=settings.MQTT_TLS_ENABLED,
-        mutual_tls=settings.MQTT_MUTUAL_TLS,
-        ca_filename=settings.MQTT_CA_CERT,
-        client_cert_filename=settings.MQTT_CLIENT_CERT,
-        client_key_filename=settings.MQTT_CLIENT_KEY,
-    )
-
-    c.connect(settings.MQTTBROKER, settings.MQTTPORT, 10)
-
-    c.publish(
-        PASSTHROUGH_TOPIC,
-        "ON" if active else "OFF",
-        qos=1,
-        retain=False,
-    )
-
-    c.disconnect()
+    deadline = time.monotonic() + 15
+    while time.monotonic() < deadline:
+        mode = _get_passthrough_mode()
+        if mode == target:
+            return redirect(url_for("home"))
+        if active and mode == "unavailable":
+            return "The Comfigurator TCP listener is unavailable.", 503
+        time.sleep(0.1)
+    return "The bridge did not confirm the requested mode. Check the add-on log.", 504
 
 
 def mqtt_publish_reload(reason: str | None = None) -> None:
-    logger.warning("MQTT reload publish requested | topic=%s | reason=%s", RELOAD_TOPIC, reason)
+    mqtt_publish_command(RELOAD_TOPIC, json.dumps({"reason": reason or "webui"}))
+
+
+def mqtt_publish_command(topic: str, payload: str) -> None:
+    logger.info("MQTT command publish requested | topic=%s", topic)
     logger.warning(
         "MQTT connection params | host=%s | port=%s | user=%s | password_set=%s | domain=%s",
         settings.MQTTBROKER, settings.MQTTPORT, settings.MQTTUSERNAME, bool(settings.MQTTPASSWORD), DOMAIN
@@ -243,9 +231,8 @@ def mqtt_publish_reload(reason: str | None = None) -> None:
         if conn_rc["rc"] != 0:
             raise RuntimeError(f"MQTT connect refused reason_code={conn_rc['rc']}")
 
-        payload = {"reason": reason or "webui"}
         logger.debug("Publishing payload: %s", payload)
-        info = c.publish(RELOAD_TOPIC, json.dumps(payload), qos=1, retain=False)
+        info = c.publish(topic, payload, qos=1, retain=False)
 
         info.wait_for_publish(timeout=5.0)
         logger.debug(
@@ -491,11 +478,12 @@ def home():
     passthrough_html = ""
 
     if passthrough_enabled:
-        mode_text = (
-            "Comfigurator Maintenance Mode"
-            if _get_passthrough_mode()
-            else "Normal MQTT Mode"
-        )
+        mode_text = {
+            "ON": "Comfigurator Maintenance Mode",
+            "OFF": "Normal MQTT Mode",
+            "transition": "Switching modes",
+            "unavailable": "Normal MQTT Mode (Comfigurator listener unavailable)",
+        }.get(_get_passthrough_mode(), "Bridge mode unavailable")
 
         passthrough_html = f"""
 <div class="card" style="border-color:#333;">
@@ -608,14 +596,12 @@ def home():
 
 @app.post("/passthrough/enable")
 def enable_passthrough():
-    _set_passthrough_mode(True)
-    return redirect(url_for("home"))
+    return _set_passthrough_mode(True)
 
 
 @app.post("/passthrough/disable")
 def disable_passthrough():
-    _set_passthrough_mode(False)
-    return redirect(url_for("home"))
+    return _set_passthrough_mode(False)
 
 
 
