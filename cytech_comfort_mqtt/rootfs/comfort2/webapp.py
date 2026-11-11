@@ -347,6 +347,8 @@ def _try_parse_cclx(path: Path) -> Tuple[bool, str, Dict[str, Any]]:
             )
 
             # Convert dataclass result into readable summary
+            if result.parse_error or result.diagnostics:
+                return False, result.parse_error or "; ".join(result.diagnostics), {}
             summary = {
                 "found": result.found,
                 "flags": result.flags.__dict__,
@@ -358,6 +360,8 @@ def _try_parse_cclx(path: Path) -> Tuple[bool, str, Dict[str, Any]]:
                 "timers": len(result.timer_properties),
                 "users": len(result.user_properties),
                 "responses": len(result.response_properties),
+                "home_controls": len(result.home_controls),
+                "home_control_actions": sum(len(c.actions) for c in result.home_controls.values()),
             }
 
             return True, "Parsed OK", summary

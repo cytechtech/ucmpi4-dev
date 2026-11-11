@@ -82,3 +82,17 @@ python -m unittest discover -s tests -p 'test_*.py' -v
 The tests execute extracted protocol/bridge handlers without starting serial, MQTT, or Home Assistant services, and validate the YAML and Jinja table template.
 
 References: [HA subviews](https://www.home-assistant.io/dashboards/views/#subview), [Markdown templates](https://www.home-assistant.io/dashboards/markdown/), [MQTT sensors](https://www.home-assistant.io/integrations/sensor.mqtt/).
+# Home Control entities
+
+The automatic Home Control dashboard is ready in `dashboards/home_control.yaml`.
+Install the bundled `www/comfort-home-control-card.js` once, following the
+[installation instructions](HOME_CONTROL_DASHBOARD.md). Later CCLX changes
+update the dashboard automatically without YAML edits or regeneration.
+
+Home Control action buttons and feedback sensors are discovered automatically
+under the Comfort device after applying a CCLX file. They use the separate
+`<DOMAIN>/home_control/...` namespace. Group, key, action and label metadata is
+available at `<DOMAIN>/meta/home_control` for independently designed dashboards.
+See the add-on README for command payloads and feedback semantics. Feedback
+sensors remain unknown until a CM report arrives; action buttons do not predict
+device state.

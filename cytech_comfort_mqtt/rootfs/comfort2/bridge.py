@@ -51,6 +51,8 @@ import serial
 import settings
 
 from cclx_parser import parse_cclx
+from home_control import HomeControl
+from home_control_mqtt import HomeControlMqtt
 from options import load_options, get_str, get_int, get_bool
 from mqtt_tls import configure_client_tls
 from certificate_manager import (
@@ -478,6 +480,8 @@ class RollingMqttLog:
 class Comfort2(mqtt.Client):
 
     def init(self, mqtt_ip, mqtt_port, mqtt_username, mqtt_password, comfort_pincode, mqtt_version):
+        self.home_control_mqtt = HomeControlMqtt(self, settings.DOMAIN)
+        self.home_control = HomeControl(self.home_control_mqtt.state)
         self.alarm_status = AlarmStatusTracker(
             lambda payload: self.publish(settings.DOMAIN + "/alarm/am_status",
                                          json.dumps(payload), qos=1, retain=False),
@@ -542,6 +546,11 @@ class Comfort2(mqtt.Client):
             self.clear_timer_discovery()
             self.clear_response_discovery()
             self.clear_battery_voltage_discovery()
+
+            self.home_control_mqtt.clear()
+            self._home_control_discovery_published = False
+            self.subscribe(f"{settings.DOMAIN}/home_control/+/+/set", qos=1)
+            self.subscribe(f"{settings.DOMAIN}/home_control/+/+/query", qos=1)
 
             time.sleep(0.25)    # Short wait for MQTT to be ready to accept commands.
 
@@ -649,6 +658,14 @@ class Comfort2(mqtt.Client):
     # The callback for when a PUBLISH message is received from the server.
     # Converted to use serial comms - send commands to Comfort via uart.
     def on_message(self, client, userdata, msg):    #=0
+        if msg.topic.startswith(f"{settings.DOMAIN}/home_control/"):
+            try:
+                if not (settings.COMFORTCONNECTED and not settings.PASSTHROUGH_ACTIVE):
+                    raise ValueError("Comfort is not connected")
+                self.home_control_mqtt.command(msg, self.home_control)
+            except (ValueError, UnicodeError) as exc:
+                logger.warning("Home Control command rejected: %s", exc)
+            return
         if msg.topic == settings.ALARMCOMMANDTOPIC and getattr(msg, "retain", False):
             logger.warning("Ignoring retained alarm command replay on %s", msg.topic)
             return
@@ -1124,6 +1141,7 @@ class Comfort2(mqtt.Client):
 
 
     def login(self):
+        self.home_control.start(False)
         self.alarm_status.reset()
         self._alarm_snapshot_due = 0.0
         self._alarm_last_report = 0.0
@@ -1486,6 +1504,8 @@ class Comfort2(mqtt.Client):
         if not getattr(self, "_responses_discovery_published", False):
             self.publish_response_discovery(settings.MQTT_DEVICE_COMFORT)
             self._responses_discovery_published = True
+        if not getattr(self, "_home_control_discovery_published", False):
+            self.publish_home_control_discovery(settings.MQTT_DEVICE_COMFORT)
 
         self.PublishBatteryVoltageDiscovery()
 
@@ -1840,6 +1860,10 @@ class Comfort2(mqtt.Client):
         settings.timer_properties = res.timer_properties
         settings.user_properties = res.user_properties
         settings.response_properties = res.response_properties
+        if res.parse_error:
+            logger.error("Home Control configuration unchanged: %s", res.parse_error)
+        else:
+            self.home_control.configure(res.home_controls)
 
         settings.DEVICEMAPFILE  = res.flags.devicemap
         settings.ZONEMAPFILE    = res.flags.zonemap
@@ -2038,6 +2062,8 @@ class Comfort2(mqtt.Client):
         logger.warning("Reload requested via source=%s reason=%r", source, reason)
 
         try:
+            self.home_control.start(False)
+            self.home_control_mqtt.clear()
             self.clear_input_discovery()
             self.clear_output_discovery()
             self.clear_flag_discovery()
@@ -2069,8 +2095,10 @@ class Comfort2(mqtt.Client):
                 self.publish_sensor_discovery(mqtt_device_comfort)
                 self.publish_timer_discovery(mqtt_device_comfort)
                 self.publish_response_discovery(mqtt_device_comfort)
+                self.publish_home_control_discovery(mqtt_device_comfort)
                 self.PublishBatteryVoltageDiscovery()
                 self.PublishBatteryVoltageStates()
+                self.home_control.start(bool(settings.COMFORTCONNECTED and not settings.PASSTHROUGH_ACTIVE))
             else:
                 logger.error("MQTT_DEVICE_COMFORT still missing after fallback; discovery not published")
 
@@ -2078,6 +2106,14 @@ class Comfort2(mqtt.Client):
             logger.exception("Reload failed source=%s reason=%r", source, reason)
             raise
 
+
+    def publish_home_control_discovery(self, device):
+        with self.home_control.lock:
+            self.home_control_mqtt.discovery(self.home_control.controls, device, [
+                {"topic": settings.ALARMAVAILABLETOPIC, "payload_available": "1", "payload_not_available": "0"},
+                {"topic": settings.ALARMCONNECTEDTOPIC, "payload_available": "1", "payload_not_available": "0"},
+            ])
+            self._home_control_discovery_published = True
 
     def ensure_mqtt_device_comfort(self):
         """
@@ -2990,6 +3026,7 @@ class Comfort2(mqtt.Client):
                 # Reconnect logic (unchanged)
                 settings.COMFORTCONNECTED = False
                 settings.FIRST_LOGIN = True
+                self.home_control.start(False)
                 logger.debug('Lost connection to Comfort, reconnecting...')
 
                 if settings.BROKERCONNECTED:
@@ -3072,6 +3109,8 @@ class Comfort2(mqtt.Client):
     def process_serial_queue(self):
         monitoring = bool(settings.COMFORTCONNECTED and not settings.PASSTHROUGH_ACTIVE
                           and self.serial is not None and self.serial.is_open)
+        self.home_control.tick(time.monotonic(), monitoring,
+                               lambda data: self.serial.write(data))
         # Events provide immediate updates; snapshots reconcile current trouble
         # bits at startup/reconnection, after AM/AR, and every five minutes.
         snapshot_interval = 300
@@ -3109,6 +3148,9 @@ class Comfort2(mqtt.Client):
 
     def handle_serial_line(self, line):
         self._alarm_last_report = time.monotonic()
+        if line[1:3] == "cm":
+            self.home_control.receive(line[1:])
+            return
         # --- LOGIN ---
         if line[1:3] == "LU":
             luMsg = comfort_protocol.ComfortLUUserLoggedIn(line[1:])
@@ -3125,6 +3167,7 @@ class Comfort2(mqtt.Client):
 
                 self.connected = True
                 settings.COMFORTCONNECTED = True
+                self.home_control.start()
                 self._alarm_snapshot_due = 0.0
 
                 self.publish(settings.ALARMCONNECTEDTOPIC, 1, qos=2, retain=True)
@@ -3148,6 +3191,7 @@ class Comfort2(mqtt.Client):
                 self.connected = False
                 settings.FIRST_LOGIN = True
                 settings.COMFORTCONNECTED = False
+                self.home_control.start(False)
                 self.alarm_status.heartbeat(False)
                 if rejected:
                     self._login_error = (

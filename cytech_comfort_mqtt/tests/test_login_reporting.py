@@ -34,6 +34,7 @@ def load_bridge():
     bridge.publish = Mock()
     bridge.alarm_log = Mock()
     bridge.alarm_status = Mock()
+    bridge.home_control = Mock()
     bridge.serial = Mock()
     bridge.setdatetime = Mock()
     bridge.readcurrentstate = Mock()

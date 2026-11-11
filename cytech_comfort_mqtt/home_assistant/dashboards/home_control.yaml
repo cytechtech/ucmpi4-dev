@@ -1,0 +1,9 @@
+title: Comfort Home Control
+views:
+  - title: Home Control
+    path: home
+    icon: mdi:home-automation
+    type: panel
+    cards:
+      - type: custom:comfort-home-control-card
+        domain: cytech_comfort_mqtt

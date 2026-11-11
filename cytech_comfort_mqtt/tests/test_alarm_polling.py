@@ -23,6 +23,7 @@ class AlarmPollingTests(unittest.TestCase):
                         comfort_protocol=SimpleNamespace(ComfortLUUserLoggedIn=lambda _: SimpleNamespace(user=1)))
         exec(compile(ast.Module(body=methods, type_ignores=[]), 'bridge.py', 'exec'), self.env)
         self.bridge = SimpleNamespace(serial=SimpleNamespace(is_open=True, write=Mock()),
+             home_control=Mock(),
              alarm_status=Mock(), _alarm_last_report=1000.0, _alarm_snapshot_due=0.0,
              serial_queue=Queue(), _line_pattern=re.compile(r'(\x03[^\r]+)'),
              handle_serial_line=Mock(), publish=Mock(), setdatetime=Mock(), readcurrentstate=Mock())
@@ -79,6 +80,20 @@ class AlarmPollingTests(unittest.TestCase):
                 self.bridge.publish_alarm_message = Mock()
                 self.env['handle_serial_line'](self.bridge, '\x03' + kind + '0301')
                 self.assertEqual(self.bridge._alarm_snapshot_due, 0)
+
+    def test_cm_and_malformed_report_do_not_block_alarm_dispatch(self):
+        seen = []
+        def dispatch(line):
+            seen.append(line)
+            if line == '\x03cm02040':
+                raise ValueError('truncated CM')
+        self.bridge.handle_serial_line = dispatch
+        for line in ('\x03cm0204FF', '\x03cm02040', '\x03AM0301'):
+            self.bridge.serial_queue.put(line)
+        with self.assertLogs('poll-test', level='ERROR'):
+            self.tick(1000)
+        self.assertEqual(seen[-1], '\x03AM0301')
+        self.bridge.serial.write.assert_called_once_with(b'\x03a?\r')
 
 if __name__ == '__main__':
     unittest.main()

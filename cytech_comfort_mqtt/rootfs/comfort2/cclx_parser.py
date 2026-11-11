@@ -25,6 +25,7 @@ from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Callable, Dict, Any, Optional, Union, Tuple
 import os
+from home_control_models import parse_home_control
 
 import defusedxml.ElementTree as ET
 
@@ -52,6 +53,9 @@ class CclxParseFlags:
 @dataclass
 class CclxParseResult:
     found: bool
+    home_controls: dict = field(default_factory=dict)
+    diagnostics: list = field(default_factory=list)
+    parse_error: Optional[str] = None
     flags: CclxParseFlags = field(default_factory=CclxParseFlags)
 
     device_properties: Dict[str, Any] = field(default_factory=dict)
@@ -123,11 +127,16 @@ def parse_cclx(
     except Exception as e:
         # Keep this robust: parse errors shouldn't crash your add-on
         logger.error("Failed to parse CCLX file '%s': %s", str(file), e)
+        result.parse_error = str(e)
         device_properties["uid"] = None
         result.found = True  # it exists, but parsing failed
         return result
 
     result.found = True
+
+    result.home_controls, result.diagnostics = parse_home_control(root)
+    for diagnostic in result.diagnostics:
+        logger.warning("%s", diagnostic)
 
     # ---- ConfigInfo -> device_properties ----
     for entry in root.iter("ConfigInfo"):
