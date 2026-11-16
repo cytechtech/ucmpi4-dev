@@ -478,12 +478,15 @@ def home():
     passthrough_html = ""
 
     if passthrough_enabled:
+        mode = _get_passthrough_mode()
         mode_text = {
             "ON": "Comfigurator Maintenance Mode",
             "OFF": "Normal MQTT Mode",
             "transition": "Switching modes",
             "unavailable": "Normal MQTT Mode (Comfigurator listener unavailable)",
-        }.get(_get_passthrough_mode(), "Bridge mode unavailable")
+        }.get(mode, "Bridge mode unavailable")
+        maintenance_button = "btn btn-primary" if mode == "OFF" else "btn"
+        normal_button = "btn btn-primary" if mode == "ON" else "btn"
 
         passthrough_html = f"""
 <div class="card" style="border-color:#333;">
@@ -500,11 +503,11 @@ def home():
 
   <div class="row" style="margin-top:12px;">
     <form method="post" action="./passthrough/enable" style="display:inline;">
-      <button class="btn" type="submit">Enable Comfigurator Mode</button>
+      <button class="{maintenance_button}" type="submit">Enable Comfigurator Mode</button>
     </form>
 
     <form method="post" action="./passthrough/disable" style="display:inline;">
-      <button class="btn btn-primary" type="submit">Return to Normal MQTT Mode</button>
+      <button class="{normal_button}" type="submit">Return to Normal MQTT Mode</button>
     </form>
   </div>
 </div>

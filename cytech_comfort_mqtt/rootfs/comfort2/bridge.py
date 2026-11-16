@@ -3014,6 +3014,7 @@ class Comfort2(mqtt.Client):
                     reader.start()
 
                     self.login()
+                    login_deadline = time.monotonic() + settings.RETRY.total_seconds()
                     settings.SAVEDTIME = datetime.now()
 
                     while settings.RUN and self.serial_running:
@@ -3021,9 +3022,11 @@ class Comfort2(mqtt.Client):
                             report_passthrough_mode("transition")
                             reported_mode = "transition"
                             break
-
-
                         self.process_serial_queue()
+
+                        if self._login_pending and time.monotonic() >= login_deadline:
+                            logger.warning("Comfort did not acknowledge serial login; reopening the serial connection")
+                            break
 
                         time.sleep(0.01)
 
