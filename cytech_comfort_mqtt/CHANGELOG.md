@@ -5,7 +5,7 @@
  
 ### Fixed
 - Button highlighting for pass through mode.
-- Moe changing issue for pass through mode.
+- Mode changing issue for pass through mode.
 
 
 ## [1.0.11] 2026-10-01
