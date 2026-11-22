@@ -3543,6 +3543,12 @@ class Comfort2(mqtt.Client):
                 logger.debug("Ignoring OP (CacheState=False): %s", line)
                 return
             
+            if not re.fullmatch(r"[0-9A-Fa-f]{4}", line[3:7]):
+                logger.warning("Malformed output report %r; requesting current output states", line)
+                self.serial.write(b"\x03Y?\r")
+                settings.SAVEDTIME = datetime.now()
+                return
+
             opMsg = comfort_protocol.ComfortOPOutputActivationReport(line[1:])
             if opMsg.state < 2:
                 if 1 <= opMsg.output <= int(settings.COMFORT_OUTPUTS):
