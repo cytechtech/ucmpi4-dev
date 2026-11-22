@@ -10,7 +10,7 @@ For more information about Cytech Comfort systems, please see the [Cytech Techno
 
 ## About
 
-This App is used to bridge a Cytech Comfort II ULTRA system to MQTT for use in Home Assistant. 
+This App is used to bridge a Cytech Comfort II ULTRA system to MQTT for use in Home Assistant. Other Comfort systems are partially supported.
 
 ## Comfort Alarm 
 
