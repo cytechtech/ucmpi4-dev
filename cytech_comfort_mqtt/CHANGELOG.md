@@ -1,3 +1,13 @@
+## [1.1.0] 2026-11-22
+
+### Added
+- Comfort Home Control MQTT and cclx parsing. 
+ 
+### Fixed
+- Button highlighting for pass through mode.
+- Moe changing issue for pass through mode.
+
+
 ## [1.0.11] 2026-10-01
 
 ### Added

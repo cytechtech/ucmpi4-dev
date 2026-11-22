@@ -51,7 +51,7 @@ class ComfortHomeControlCard extends HTMLElement {
     if (!menu) { text(card, "p", "Waiting for Home Control discovery and menu metadata."); return; }
     const offline = menu.state === "unavailable" || menu.state === "unknown";
     text(card, "p", offline ? "Comfort is unavailable. Actions are disabled." :
-      "Feedback comes from Comfort. Actions do not predict device state.");
+      "When a device provides feedback, its status updates as soon as Comfort reports it.");
     if (this.error) text(card, "p", this.error, "error").setAttribute("role", "alert");
     const items = Array.isArray(menu.attributes.items) ? menu.attributes.items : [];
     if (!items.length) { text(card, "p", "No Home Control definitions in the active CCLX."); return; }
